@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { emit } from '@tauri-apps/api/event';
   import PetCanvas from './lib/pet/PetCanvas.svelte';
 
   let petId = $state('default-cat');
@@ -13,6 +14,8 @@
       const s = await invoke<number>('get_scale');
       if (typeof s === 'number' && s >= 1 && s <= 10) scale = s;
     } catch (e) { console.error('init:', e); }
+
+    await emit('pet-changed', petId);
 
     const { listen } = await import('@tauri-apps/api/event');
     const unlisten = listen<number>('scale-changed', (e) => {

@@ -94,23 +94,6 @@
     }
   }
 
-  async function save() {
-    error = null;
-    try {
-      const raw = await invoke<string>('read_json', { id: petId, filename: 'config.json' });
-      const cfg = JSON.parse(raw);
-      cfg.states = states;
-      if (!cfg.defaultState || !states[cfg.defaultState]) {
-        cfg.defaultState = Object.keys(states)[0] || 'idle';
-      }
-      await invoke('write_json', { id: petId, filename: 'config.json', content: JSON.stringify(cfg, null, 2) });
-      clearDirty();
-      await emit('pet-changed', petId);
-    } catch (e) {
-      error = `Save failed: ${e instanceof Error ? e.message : e}`;
-    }
-  }
-
   function addState() {
     const name = uniqueStateName();
     states = { ...states, [name]: { entry: fallbackAnimation(), transitions: {} } };

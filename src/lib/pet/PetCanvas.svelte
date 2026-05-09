@@ -34,6 +34,13 @@
   let targetX = 0;
   let targetY = 0;
   let skipNextClick = false;
+  let ready = $state(false);
+
+  $effect(() => {
+    if (ready && petId) {
+      loadPet(petId).then(() => applyConfig());
+    }
+  });
 
   function dispatch(event: PetEvent) {
     stateMachine?.dispatch(event);
@@ -48,7 +55,6 @@
   async function loadPet(id: string) {
     sprites.clear();
     try {
-      // Read manifest for frame dimensions
       try {
         const mRaw = await invoke<string>('read_json', { id, filename: 'manifest.json' });
         const m = JSON.parse(mRaw);
@@ -72,21 +78,12 @@
         }
       }
     } catch (e) {
-      console.error('loadPet config:', e);
+      console.error('loadPet:', e);
       config = { animations: {}, defaultState: 'idle', states: {} };
     }
   }
 
   async function init() {
-    await loadPet(petId);
-    applyConfig();
-    controller.onEnd(() => {
-      stateMachine?.dispatch('animation_end');
-    });
-
-    lastTime = performance.now();
-    animationId = requestAnimationFrame(tick);
-
     const { listen } = await import('@tauri-apps/api/event');
     unlistenPetChanged = await listen('pet-changed', async (e) => {
       if (typeof e.payload === 'string') {
@@ -94,6 +91,13 @@
         applyConfig();
       }
     });
+
+    controller.onEnd(() => {
+      stateMachine?.dispatch('animation_end');
+    });
+
+    lastTime = performance.now();
+    animationId = requestAnimationFrame(tick);
   }
 
   function resizeCanvas() {
@@ -113,6 +117,8 @@
     mainWindow = getCurrentWindow();
 
     init();
+
+    ready = true;
 
     return () => {
       cancelAnimationFrame(animationId);

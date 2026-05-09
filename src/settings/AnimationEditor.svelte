@@ -102,6 +102,20 @@
       for (const [oldName, newName] of Object.entries(renames)) {
         renameReferences(cfg, oldName, newName);
       }
+      for (const [name, anim] of Object.entries(animations)) {
+        const isGif = anim.source.toLowerCase().endsWith('.gif');
+        if (isGif) continue;
+        const fc = anim.frameCount ?? 4;
+        const fpr = anim.framesPerRow ?? 2;
+        if (!fc || fc <= 0) {
+          error = `"${name}": Frames is empty or invalid`;
+          return;
+        }
+        if (fc % fpr !== 0) {
+          error = `"${name}": Frames (${fc}) must be divisible by Per Row (${fpr})`;
+          return;
+        }
+      }
       cfg.animations = animations;
       if (cfg.defaultState && cfg.states?.[cfg.defaultState] && !animations[cfg.states[cfg.defaultState].entry]) {
         cfg.states[cfg.defaultState].entry = Object.keys(animations)[0] || '';
@@ -119,7 +133,8 @@
     const isGif = filename.toLowerCase().endsWith('.gif');
     return {
       frameTime: isGif ? 0 : 100,
-      framesPerRow: isGif ? 1 : undefined as number | undefined,
+      frameCount: isGif ? undefined : 4,
+      framesPerRow: isGif ? 1 : 2,
     };
   }
 
@@ -206,11 +221,11 @@
               {#each imageFiles as f}<option value={f}>{f}</option>{/each}
               {#if !imageFiles.includes(anim.source)}<option value={anim.source}>{anim.source}</option>{/if}
             </select>
-            <input class="ft" type="number" min={0} value={anim.frameTime} oninput={(e) => { const v = parseInt((e.target as HTMLInputElement).value); anim.frameTime = isNaN(v) ? 0 : Math.max(0, v); markDirty(); }} placeholder={anim.source.toLowerCase().endsWith('.gif') ? 'auto' : '100'} />
-            <input class="fc" type="number" min={0} value={anim.frameCount ?? ''} oninput={(e) => { const v = (e.target as HTMLInputElement).value; anim.frameCount = v ? Math.max(0, parseInt(v)) : undefined; markDirty(); }} placeholder={anim.source.toLowerCase().endsWith('.gif') ? 'all' : '4'} />
-            <input class="fpr" type="number" min={1} value={anim.source.toLowerCase().endsWith('.gif') ? '' : (anim.framesPerRow ?? '')} disabled={anim.source.toLowerCase().endsWith('.gif')} oninput={(e) => { const v = (e.target as HTMLInputElement).value; anim.framesPerRow = v ? Math.max(1, parseInt(v)) : undefined; markDirty(); }} placeholder={anim.source.toLowerCase().endsWith('.gif') ? '—' : '2'} />
+            <input class="ft" type="number" min={0} value={anim.frameTime} onblur={(e) => { const v = parseInt((e.target as HTMLInputElement).value); anim.frameTime = isNaN(v) ? 0 : Math.max(0, v); markDirty(); }} onkeydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} placeholder={anim.source.toLowerCase().endsWith('.gif') ? 'auto' : '100'} />
+            <input class="fc" type="number" min={0} value={anim.frameCount ?? ''} onblur={(e) => { const v = (e.target as HTMLInputElement).value; anim.frameCount = v ? Math.max(0, parseInt(v)) : undefined; markDirty(); }} onkeydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} placeholder={anim.source.toLowerCase().endsWith('.gif') ? 'all' : '4'} />
+            <input class="fpr" type="number" min={1} value={anim.source.toLowerCase().endsWith('.gif') ? '' : (anim.framesPerRow ?? '')} disabled={anim.source.toLowerCase().endsWith('.gif')} onblur={(e) => { const v = (e.target as HTMLInputElement).value; anim.framesPerRow = v ? Math.max(1, parseInt(v)) : undefined; markDirty(); }} onkeydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} placeholder={anim.source.toLowerCase().endsWith('.gif') ? '—' : '2'} />
             <label class="lp"><input type="checkbox" checked={anim.loop} onchange={(e) => { anim.loop = (e.target as HTMLInputElement).checked; markDirty(); }} /></label>
-            <input class="du" type="number" min={0} value={anim.duration ?? ''} oninput={(e) => { const v = (e.target as HTMLInputElement).value; anim.duration = v ? Math.max(0, parseInt(v)) : undefined; markDirty(); }} placeholder="—" />
+            <input class="du" type="number" min={0} value={anim.duration ?? ''} onblur={(e) => { const v = (e.target as HTMLInputElement).value; anim.duration = v ? Math.max(0, parseInt(v)) : undefined; markDirty(); }} onkeydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} placeholder="—" />
             <button class="del-btn" onclick={() => remove(name)} title="Remove">✕</button>
           </div>
         {/each}

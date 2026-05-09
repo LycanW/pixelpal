@@ -73,19 +73,19 @@
     </div>
   </header>
 
-  <div style="display: {view === 'home' ? 'block' : 'none'}">
+  {#if view === 'home'}
     <HomeView onActivatePet={setActivePet} onSettingsPet={openPetSettings} {activePetId} />
-  </div>
+  {/if}
 
-  <div style="display: {view === 'detail' ? 'block' : 'none'}">
+  {#if view === 'detail'}
     {#if selectedPet}
       <PetDetailView petId={selectedPet} onBack={backToHome} onDirtyChange={(d) => { dirtyTabs = d; }} />
     {/if}
-  </div>
+  {/if}
 
-  <div style="display: {view === 'display' ? 'block' : 'none'}">
+  {#if view === 'display'}
     <DisplaySettings />
-  </div>
+  {/if}
 </div>
 
 <style>

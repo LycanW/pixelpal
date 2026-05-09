@@ -8,7 +8,7 @@ mod commands;
 
 fn build_menu(app: &tauri::AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::Error>> {
   let state = app.state::<commands::AppState>();
-  let settings = state.settings.lock().unwrap();
+  let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
   let pets_dir = commands::resolve_pets_dir(&settings);
   let pets = commands::scan_pets(&pets_dir);
   let active = settings.active_pet.clone().unwrap_or_default();
@@ -87,7 +87,7 @@ fn handle_menu_event(app: &tauri::AppHandle, event: tauri::menu::MenuEvent) {
     _ => {
       if let Some(pet_id) = id.strip_prefix("pet_") {
         let state = app.state::<commands::AppState>();
-        let mut settings = state.settings.lock().unwrap();
+        let mut settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
         settings.active_pet = Some(pet_id.to_string());
         commands::save_settings(&settings);
         drop(settings);
@@ -137,6 +137,18 @@ pub fn run() {
         )?;
       }
       build_tray(app.handle())?;
+
+      if let Some(window) = app.handle().get_webview_window("main") {
+        if let Ok(Some(monitor)) = window.primary_monitor() {
+          let screen = monitor.size();
+          let win_size = window.outer_size().unwrap();
+          let pad = (screen.width.min(screen.height) / 40).max(8);
+          let x = screen.width.saturating_sub(win_size.width).saturating_sub(pad);
+          let y = screen.height.saturating_sub(win_size.height).saturating_sub(pad);
+          let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+        }
+      }
+
       Ok(())
     })
     .run(tauri::generate_context!())

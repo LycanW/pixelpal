@@ -52,15 +52,15 @@
   </div>
 
   <div class="tab-content">
-    <div style="display: {tab === 'interactions' ? 'block' : 'none'}">
+    {#if tab === 'interactions'}
       <StateEditor {petId} onDirtyChange={(d) => setDirty('interactions', d)} />
-    </div>
-    <div style="display: {tab === 'animations' ? 'block' : 'none'}">
+    {/if}
+    {#if tab === 'animations'}
       <AnimationEditor {petId} onDirtyChange={(d) => setDirty('animations', d)} />
-    </div>
-    <div style="display: {tab === 'config' ? 'block' : 'none'}">
+    {/if}
+    {#if tab === 'config'}
       <PetConfigEditor {petId} onDirtyChange={(d) => setDirty('config', d)} />
-    </div>
+    {/if}
   </div>
 </div>
 

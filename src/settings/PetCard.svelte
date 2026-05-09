@@ -99,7 +99,7 @@
       renderStatic();
     } catch (e) { console.error('PetCard sprite:', e); }
     controller = new AnimationController();
-    controller.setAnimations({ [defaultAnim]: { source: defaultSource, frameTime: isGif ? 0 : defaultFrameTime, loop: true, frameCount: isGif ? 0 : defaultFrameCount, framesPerRow: defaultFramesPerRow } });
+    controller.setAnimations({ [defaultAnim]: { source: defaultSource, frameTime: isGif ? 0 : defaultFrameTime, loop: true, frameCount: isGif ? undefined : defaultFrameCount, framesPerRow: defaultFramesPerRow } });
     if (isGif && (sprite as GifFrameData).delays) {
       controller.setFrameDelays(defaultAnim, (sprite as GifFrameData).delays);
     }

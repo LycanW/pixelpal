@@ -39,14 +39,16 @@ export class AnimationController {
     this.activeDuration += deltaMs;
 
     const delays = this.perFrameDelays[this.currentAction];
-    // For GIF: use per-frame delay from the file; frameTime in def can override uniformly
-    const frameTime = delays
-      ? (def.frameTime > 0 ? def.frameTime : delays[this.frameIndex] ?? 100)
-      : def.frameTime;
     const maxFrame = (def.frameCount ?? (delays ? delays.length : FRAMES_PER_ACTION)) - 1;
 
-    if (this.timer >= frameTime) {
+    let iterations = 0;
+    while (iterations < 100) {
+      const frameTime = Math.max(1, delays
+        ? (def.frameTime > 0 ? def.frameTime : delays[this.frameIndex] ?? 100)
+        : def.frameTime);
+      if (this.timer < frameTime) break;
       this.timer -= frameTime;
+      iterations++;
 
       if (this.frameIndex >= maxFrame) {
         if (def.loop) {
@@ -60,7 +62,6 @@ export class AnimationController {
       }
     }
 
-    // Check duration *after* frame advance so the final frame is shown
     if (def.duration && this.activeDuration >= def.duration) {
       this.onActionEnd?.(this.currentAction);
     }
