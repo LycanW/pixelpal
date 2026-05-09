@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settings — Desktop Pet</title>
+    <style>
+      :root {
+        --bg-primary: #f5f5f5;
+        --bg-secondary: #ffffff;
+        --text-primary: #222222;
+        --text-secondary: #666666;
+        --text-muted: #999999;
+        --accent: #4a90d9;
+        --danger: #cc0000;
+        --border: #dddddd;
+        --border-input: #cccccc;
+        --radius-sm: 4px;
+        --radius-md: 8px;
+        --focus-ring: 0 0 0 2px rgba(74,144,217,0.35);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-primary: #1a1a1e;
+          --bg-secondary: #26262b;
+          --text-primary: #e0e0e0;
+          --text-secondary: #a0a0a0;
+          --text-muted: #707070;
+          --accent: #5a9ae8;
+          --danger: #e04848;
+          --border: #3a3a40;
+          --border-input: #4a4a50;
+          --focus-ring: 0 0 0 2px rgba(90,154,232,0.35);
+        }
+
+        .card.active { background: #202530 !important; }
+        .error-box { background: #3a1515 !important; }
+        .error-box p { color: #e04848 !important; }
+      }
+
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0; width: 100%; height: 100%;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: var(--bg-primary); color: var(--text-primary);
+      }
+
+      :focus-visible { outline: none; }
+
+      #app { width: 100%; height: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/settings/main.ts"></script>
+  </body>
+</html>
