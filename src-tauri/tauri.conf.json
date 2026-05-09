@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "DesktopPet",
+  "productName": "PixelPal",
   "version": "0.1.0",
-  "identifier": "com.desktop-pet.app",
+  "identifier": "com.pixelpal.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Desktop Pet",
+        "title": "PixelPal",
         "width": 160,
         "height": 160,
         "resizable": false,

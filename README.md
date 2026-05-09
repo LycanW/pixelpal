@@ -1,11 +1,11 @@
-# Desktop Pet
+# PixelPal
 
 A pixel-art desktop pet that lives on your screen. Built with Svelte 5 and Tauri v2.
 
 ## Project Structure
 
 ```text
-desktop-pet/
+pixelpal/
   src/                          # Frontend (Svelte 5 + TypeScript)
     main.ts                     #   Main window entry
     App.svelte                  #   Root component

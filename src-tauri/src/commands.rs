@@ -29,7 +29,7 @@ pub struct AppState {
 pub fn settings_path() -> PathBuf {
   dirs::data_dir()
     .unwrap_or_else(|| PathBuf::from("."))
-    .join("desktop-pet")
+    .join("pixelpal")
     .join("app-settings.json")
 }
 

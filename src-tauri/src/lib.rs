@@ -62,7 +62,7 @@ fn build_tray(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> 
     .icon(app.default_window_icon().unwrap().clone())
     .menu(&menu)
     .on_menu_event(|app, event| handle_menu_event(app, event))
-    .tooltip("Desktop Pet")
+    .tooltip("PixelPal")
     .build(app)?;
 
   Ok(())
