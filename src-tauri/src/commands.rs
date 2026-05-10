@@ -68,10 +68,9 @@ pub fn resolve_pets_dir(settings: &AppSettings) -> PathBuf {
       return p;
     }
   }
-  std::env::current_exe()
-    .ok()
-    .and_then(|exe| exe.parent().map(|p| p.to_path_buf()))
+  dirs::data_dir()
     .unwrap_or_else(|| PathBuf::from("."))
+    .join("pixelpal")
     .join("pets")
 }
 
