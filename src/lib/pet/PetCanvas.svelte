@@ -9,7 +9,7 @@
   import { FRAME_SIZE } from './config';
   import type { PetConfig, PetEvent, GifFrameData } from './types';
 
-  let { petId = 'default-cat', scale = 5 }: { petId?: string; scale?: number } = $props();
+  let { petId = '', scale = 5 }: { petId?: string; scale?: number } = $props();
 
 
   let mainWindow: ReturnType<typeof getCurrentWindow> | null = null;

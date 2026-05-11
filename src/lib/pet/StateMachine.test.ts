@@ -84,7 +84,7 @@ describe('StateMachine', () => {
     expect(ctrl.currentAction).toBe('idle');
   });
 
-  it('handles complex state machine like default-cat', () => {
+  it('handles complex state machine with idle/walk/sleep states', () => {
     const ctrl = createMockController();
     const sm = new StateMachine({
       idle: {

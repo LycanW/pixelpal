@@ -4,7 +4,7 @@
   import { emit } from '@tauri-apps/api/event';
   import PetCanvas from './lib/pet/PetCanvas.svelte';
 
-  let petId = $state('default-cat');
+  let petId = $state('');
   let scale = $state(5);
   let unlistenScale: (() => void) | null = null;
 
