@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State};
+use tauri_plugin_autostart::ManagerExt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -10,6 +11,7 @@ pub struct AppSettings {
   pub always_on_top: Option<bool>,
   pub scale: Option<u32>,
   pub language: Option<String>,
+  pub autostart: Option<bool>,
 }
 
 impl Default for AppSettings {
@@ -20,6 +22,7 @@ impl Default for AppSettings {
       always_on_top: Some(true),
       scale: Some(5),
       language: Some("zh".into()),
+      autostart: Some(false),
     }
   }
 }
@@ -299,6 +302,24 @@ pub fn set_language(state: tauri::State<AppState>, lang: String) {
   let mut settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
   settings.language = Some(lang);
   save_settings(&settings);
+}
+
+#[tauri::command]
+pub fn get_autostart(state: tauri::State<AppState>) -> bool {
+  state.settings.lock().unwrap_or_else(|e| e.into_inner()).autostart.unwrap_or(false)
+}
+
+#[tauri::command]
+pub fn set_autostart(app: tauri::AppHandle, state: tauri::State<AppState>, on: bool) {
+  let mut settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
+  settings.autostart = Some(on);
+  save_settings(&settings);
+  drop(settings);
+  let _ = if on {
+    app.autolaunch().enable()
+  } else {
+    app.autolaunch().disable()
+  };
 }
 
 #[tauri::command]
@@ -691,6 +712,7 @@ mod tests {
     assert_eq!(s.always_on_top, Some(true));
     assert_eq!(s.scale, Some(5));
     assert_eq!(s.language, Some("zh".into()));
+    assert_eq!(s.autostart, Some(false));
     assert_eq!(s.pets_dir, None);
   }
 
@@ -702,6 +724,7 @@ mod tests {
       always_on_top: Some(false),
       scale: Some(3),
       language: Some("en".into()),
+      autostart: Some(true),
     };
     let json = serde_json::to_string_pretty(&original).unwrap();
     let restored: AppSettings = serde_json::from_str(&json).unwrap();
@@ -710,6 +733,7 @@ mod tests {
     assert_eq!(restored.always_on_top, original.always_on_top);
     assert_eq!(restored.scale, original.scale);
     assert_eq!(restored.language, original.language);
+    assert_eq!(restored.autostart, original.autostart);
   }
 
   #[test]

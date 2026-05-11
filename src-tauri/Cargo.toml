@@ -27,5 +27,6 @@ log = "0.4"
 tauri = { version = "2.11.1", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-log = "2"
+tauri-plugin-autostart = "2"
 base64 = "0.22"
 dirs = "6"

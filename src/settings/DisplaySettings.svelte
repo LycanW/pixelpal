@@ -5,6 +5,7 @@
   let petsDir = $state('');
   let scale = $state(5);
   let alwaysOnTop = $state(true);
+  let autostart = $state(false);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
@@ -15,6 +16,7 @@
       petsDir = await invoke<string>('get_pets_dir');
       scale = await invoke<number>('get_scale');
       alwaysOnTop = await invoke<boolean>('get_always_on_top');
+      autostart = await invoke<boolean>('get_autostart');
       await loadLanguage();
     } catch (e) {
       error = `Failed to load settings: ${e instanceof Error ? e.message : e}`;
@@ -39,6 +41,16 @@
     } catch (e) {
       alwaysOnTop = !alwaysOnTop;
       console.error('Always-on-top toggle failed:', e);
+    }
+  }
+
+  async function toggleAutostart() {
+    autostart = !autostart;
+    try {
+      await invoke('set_autostart', { on: autostart });
+    } catch (e) {
+      autostart = !autostart;
+      console.error('Autostart toggle failed:', e);
     }
   }
 
@@ -74,6 +86,14 @@
       <label class="toggle" for="aot-check">
         <input id="aot-check" type="checkbox" checked={alwaysOnTop} onchange={toggleAot} />
         {alwaysOnTop ? 'On' : 'Off'}
+      </label>
+    </div>
+
+    <div class="field">
+      <label class="label" for="autostart-check">{t('display.autostart')}</label>
+      <label class="toggle" for="autostart-check">
+        <input id="autostart-check" type="checkbox" checked={autostart} onchange={toggleAutostart} />
+        {autostart ? 'On' : 'Off'}
       </label>
     </div>
 

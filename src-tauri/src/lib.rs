@@ -3,6 +3,7 @@ use tauri::{
   menu::{IsMenuItem, Menu, MenuItem, CheckMenuItem, Submenu},
   tray::TrayIconBuilder,
 };
+use tauri_plugin_autostart::ManagerExt;
 
 mod commands;
 
@@ -128,8 +129,14 @@ pub fn run() {
       commands::delete_pet_image,
       commands::get_language,
       commands::set_language,
+      commands::get_autostart,
+      commands::set_autostart,
     ])
     .plugin(tauri_plugin_dialog::init())
+    .plugin(tauri_plugin_autostart::init(
+      tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+      None,
+    ))
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -139,6 +146,19 @@ pub fn run() {
         )?;
       }
       build_tray(app.handle())?;
+
+      // Sync autostart registration with user preference
+      let state = app.state::<commands::AppState>();
+      let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
+      let should_autostart = settings.autostart.unwrap_or(false);
+      drop(settings);
+      if let Ok(enabled) = app.autolaunch().is_enabled() {
+        if should_autostart && !enabled {
+          let _ = app.autolaunch().enable();
+        } else if !should_autostart && enabled {
+          let _ = app.autolaunch().disable();
+        }
+      }
 
       Ok(())
     })
