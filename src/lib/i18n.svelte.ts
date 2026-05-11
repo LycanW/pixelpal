@@ -134,7 +134,6 @@ const dict: Record<Lang, Record<string, string>> = {
 };
 
 export function t(key: string): string {
-  const _ = i18n.currentLang;
   return dict[i18n.currentLang]?.[key] ?? dict['en']?.[key] ?? key;
 }
 

@@ -84,7 +84,6 @@
 </div>
 
 <style>
-  .editor-panel { }
   h2 { font-size: 15px; margin: 0 0 12px; color: var(--text-primary); }
   .status { color: var(--text-muted); font-size: 13px; }
   .fields { display: flex; flex-direction: column; gap: 10px; max-width: 320px; }

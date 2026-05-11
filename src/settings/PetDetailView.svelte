@@ -67,7 +67,6 @@
 </div>
 
 <style>
-  .detail { }
   .top-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
   .back-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 14px; padding: 0; font-family: inherit; }
   .back-btn:hover { text-decoration: underline; }

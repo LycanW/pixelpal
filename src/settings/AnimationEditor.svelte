@@ -270,7 +270,6 @@
 </div>
 
 <style>
-  .editor-panel { }
   .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
   h2 { font-size: 15px; margin: 0; color: var(--text-primary); }
   .btn { padding: 5px 12px; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; }

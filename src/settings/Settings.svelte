@@ -63,8 +63,7 @@
   <header>
     <h1>{t('settings.title')}</h1>
     <div class="header-actions">
-      {#if view === 'detail'}
-      {:else}
+      {#if view !== 'detail'}
         <button class="gear-btn" onclick={() => { view = view === 'display' ? 'home' : 'display'; }}>
           {view === 'display' ? t('settings.back') : t('settings.display')}
         </button>
