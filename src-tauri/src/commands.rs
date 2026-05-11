@@ -18,7 +18,7 @@ impl Default for AppSettings {
   fn default() -> Self {
     Self {
       pets_dir: None,
-      active_pet: Some("default-cat".into()),
+      active_pet: None,
       always_on_top: Some(true),
       scale: Some(5),
       language: Some("zh".into()),
@@ -202,7 +202,7 @@ pub fn set_pets_dir(state: State<AppState>, path: String) -> Result<(), String> 
 }
 
 pub fn resolve_active_pet(active_pet: Option<String>, pets_dir: &Path) -> String {
-  let active = active_pet.unwrap_or_else(|| "default-cat".into());
+  let active = active_pet.unwrap_or_default();
   let pets = scan_pets(pets_dir);
   if pets.is_empty() {
     return "".into();
@@ -481,7 +481,7 @@ mod tests {
 
   #[test]
   fn test_sanitize_pet_id_valid() {
-    assert!(sanitize_pet_id("default-cat").is_ok());
+    assert!(sanitize_pet_id("a").is_ok());
     assert!(sanitize_pet_id("MP").is_ok());
     assert!(sanitize_pet_id("1234").is_ok());
   }
@@ -717,7 +717,7 @@ mod tests {
   #[test]
   fn test_settings_default() {
     let s = AppSettings::default();
-    assert_eq!(s.active_pet, Some("default-cat".into()));
+    assert_eq!(s.active_pet, None);
     assert_eq!(s.always_on_top, Some(true));
     assert_eq!(s.scale, Some(5));
     assert_eq!(s.language, Some("zh".into()));
