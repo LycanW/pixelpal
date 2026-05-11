@@ -198,20 +198,26 @@ pub fn set_pets_dir(state: State<AppState>, path: String) -> Result<(), String> 
   Ok(())
 }
 
-#[tauri::command]
-pub fn get_active_pet(state: State<AppState>) -> String {
-  let (active, pets_dir) = {
-    let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
-    let active = settings.active_pet.clone().unwrap_or_else(|| "default-cat".into());
-    let pets_dir = resolve_pets_dir(&settings);
-    (active, pets_dir)
-  };
-  let pets = scan_pets(&pets_dir);
-  if pets.contains(&active) || pets.is_empty() {
+pub fn resolve_active_pet(active_pet: Option<String>, pets_dir: &Path) -> String {
+  let active = active_pet.unwrap_or_else(|| "default-cat".into());
+  let pets = scan_pets(pets_dir);
+  if pets.is_empty() {
+    return "".into();
+  }
+  if pets.contains(&active) {
     active
   } else {
     pets.into_iter().next().unwrap_or(active)
   }
+}
+
+#[tauri::command]
+pub fn get_active_pet(state: State<AppState>) -> String {
+  let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
+  let active = settings.active_pet.clone();
+  let pets_dir = resolve_pets_dir(&settings);
+  drop(settings);
+  resolve_active_pet(active, &pets_dir)
 }
 
 #[tauri::command]
@@ -432,4 +438,286 @@ fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result
     }
   }
   Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use std::fs;
+  use tempfile::TempDir;
+
+  // ── sanitize_pet_id ──
+
+  #[test]
+  fn test_sanitize_pet_id_valid() {
+    assert!(sanitize_pet_id("default-cat").is_ok());
+    assert!(sanitize_pet_id("MP").is_ok());
+    assert!(sanitize_pet_id("1234").is_ok());
+  }
+
+  #[test]
+  fn test_sanitize_pet_id_empty() {
+    assert!(sanitize_pet_id("").is_err());
+  }
+
+  #[test]
+  fn test_sanitize_pet_id_dotdot() {
+    assert!(sanitize_pet_id("..").is_err());
+    assert!(sanitize_pet_id("foo..bar").is_err());
+  }
+
+  #[test]
+  fn test_sanitize_pet_id_slash() {
+    assert!(sanitize_pet_id("foo/bar").is_err());
+  }
+
+  #[test]
+  fn test_sanitize_pet_id_backslash() {
+    assert!(sanitize_pet_id("foo\\bar").is_err());
+  }
+
+  // ── sanitize_pet_path ──
+
+  #[test]
+  fn test_sanitize_pet_path_valid_file() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+    fs::create_dir(pets_dir.join("cat")).unwrap();
+    fs::write(pets_dir.join("cat").join("idle.png"), "fake").unwrap();
+
+    let result = sanitize_pet_path(&pets_dir, "cat", "idle.png");
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), pets_dir.join("cat").join("idle.png"));
+  }
+
+  #[test]
+  fn test_sanitize_pet_path_nonexistent_file_in_valid_dir() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+    fs::create_dir(pets_dir.join("cat")).unwrap();
+
+    let result = sanitize_pet_path(&pets_dir, "cat", "missing.png");
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), pets_dir.join("cat").join("missing.png"));
+  }
+
+  #[test]
+  fn test_sanitize_pet_path_dotdot_in_id() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+
+    assert!(sanitize_pet_path(&pets_dir, "..", "x.png").is_err());
+  }
+
+  #[test]
+  fn test_sanitize_pet_path_dotdot_in_filename() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+    fs::create_dir(pets_dir.join("cat")).unwrap();
+
+    assert!(sanitize_pet_path(&pets_dir, "cat", "../x.png").is_err());
+  }
+
+  #[test]
+  fn test_sanitize_pet_path_traversal_via_filename() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+    fs::create_dir(pets_dir.join("cat")).unwrap();
+
+    assert!(sanitize_pet_path(&pets_dir, "cat", "../../etc/passwd").is_err());
+  }
+
+  #[test]
+  fn test_sanitize_pet_path_missing_pets_dir() {
+    let result = sanitize_pet_path(Path::new("/nonexistent/path"), "cat", "idle.png");
+    assert!(result.is_err());
+  }
+
+  #[test]
+  fn test_sanitize_pet_path_traversal_resolved() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+    fs::create_dir(pets_dir.join("cat")).unwrap();
+    // Create a symlink or adjacent dir to test canonical path boundary
+    fs::create_dir(dir.path().join("outside")).unwrap();
+    #[cfg(unix)]
+    {
+      use std::os::unix::fs::symlink;
+      let _ = symlink(dir.path().join("outside"), pets_dir.join("cat").join("link"));
+    }
+
+    // Even without symlink, filename with .. should be rejected before canonicalization
+    assert!(sanitize_pet_path(&pets_dir, "cat", "link/../../outside.txt").is_err());
+  }
+
+  // ── resolve_pets_dir ──
+
+  #[test]
+  fn test_resolve_pets_dir_custom_exists() {
+    let dir = TempDir::new().unwrap();
+    let custom = dir.path().join("my_pets");
+    fs::create_dir(&custom).unwrap();
+
+    let settings = AppSettings {
+      pets_dir: Some(custom.to_string_lossy().to_string()),
+      ..Default::default()
+    };
+
+    assert_eq!(resolve_pets_dir(&settings), custom);
+  }
+
+  #[test]
+  fn test_resolve_pets_dir_custom_not_exists_fallback() {
+    let settings = AppSettings {
+      pets_dir: Some("/nonexistent/path".into()),
+      ..Default::default()
+    };
+
+    let result = resolve_pets_dir(&settings);
+    let s = result.to_string_lossy();
+    assert!(s.contains("pixelpal"), "fallback should contain pixelpal: {}", s);
+    assert!(s.contains("pets"), "fallback should contain pets: {}", s);
+  }
+
+  #[test]
+  fn test_resolve_pets_dir_none_fallback() {
+    let settings = AppSettings::default();
+    let result = resolve_pets_dir(&settings);
+    let s = result.to_string_lossy();
+    assert!(s.contains("pixelpal"), "fallback should contain pixelpal: {}", s);
+    assert!(s.contains("pets"), "fallback should contain pets: {}", s);
+  }
+
+  // ── scan_pets ──
+
+  #[test]
+  fn test_scan_pets_empty() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+
+    assert!(scan_pets(&pets_dir).is_empty());
+  }
+
+  #[test]
+  fn test_scan_pets_skips_missing_manifest() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+    fs::create_dir(pets_dir.join("no_manifest")).unwrap();
+
+    assert!(scan_pets(&pets_dir).is_empty());
+  }
+
+  #[test]
+  fn test_scan_pets_skips_files() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+    fs::write(pets_dir.join("not_a_pet"), "").unwrap();
+
+    assert!(scan_pets(&pets_dir).is_empty());
+  }
+
+  #[test]
+  fn test_scan_pets_finds_valid() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+
+    fs::create_dir(pets_dir.join("zebra")).unwrap();
+    fs::write(pets_dir.join("zebra").join("manifest.json"), "{}").unwrap();
+
+    fs::create_dir(pets_dir.join("alpha")).unwrap();
+    fs::write(pets_dir.join("alpha").join("manifest.json"), "{}").unwrap();
+
+    let result = scan_pets(&pets_dir);
+    assert_eq!(result, vec!["alpha", "zebra"]);
+  }
+
+  #[test]
+  fn test_resolve_active_pet_empty_returns_empty_string() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+
+    let result = resolve_active_pet(Some("ghost".into()), &pets_dir);
+    assert_eq!(result, "");
+  }
+
+  #[test]
+  fn test_resolve_active_pet_fallback_to_first() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+
+    fs::create_dir(pets_dir.join("alpha")).unwrap();
+    fs::write(pets_dir.join("alpha").join("manifest.json"), "{}").unwrap();
+
+    // active pet does not exist, should fallback to first available
+    let result = resolve_active_pet(Some("ghost".into()), &pets_dir);
+    assert_eq!(result, "alpha");
+  }
+
+  #[test]
+  fn test_resolve_active_pet_matching_exists() {
+    let dir = TempDir::new().unwrap();
+    let pets_dir = dir.path().join("pets");
+    fs::create_dir(&pets_dir).unwrap();
+
+    fs::create_dir(pets_dir.join("alpha")).unwrap();
+    fs::write(pets_dir.join("alpha").join("manifest.json"), "{}").unwrap();
+
+    fs::create_dir(pets_dir.join("beta")).unwrap();
+    fs::write(pets_dir.join("beta").join("manifest.json"), "{}").unwrap();
+
+    let result = resolve_active_pet(Some("beta".into()), &pets_dir);
+    assert_eq!(result, "beta");
+  }
+
+  // ── AppSettings ──
+
+  #[test]
+  fn test_settings_default() {
+    let s = AppSettings::default();
+    assert_eq!(s.active_pet, Some("default-cat".into()));
+    assert_eq!(s.always_on_top, Some(true));
+    assert_eq!(s.scale, Some(5));
+    assert_eq!(s.language, Some("zh".into()));
+    assert_eq!(s.pets_dir, None);
+  }
+
+  #[test]
+  fn test_settings_serde_roundtrip() {
+    let original = AppSettings {
+      pets_dir: Some("/custom/path".into()),
+      active_pet: Some("MP".into()),
+      always_on_top: Some(false),
+      scale: Some(3),
+      language: Some("en".into()),
+    };
+    let json = serde_json::to_string_pretty(&original).unwrap();
+    let restored: AppSettings = serde_json::from_str(&json).unwrap();
+    assert_eq!(restored.pets_dir, original.pets_dir);
+    assert_eq!(restored.active_pet, original.active_pet);
+    assert_eq!(restored.always_on_top, original.always_on_top);
+    assert_eq!(restored.scale, original.scale);
+    assert_eq!(restored.language, original.language);
+  }
+
+  #[test]
+  fn test_settings_serde_partial() {
+    // Simulates an older settings file missing some fields
+    let json = r#"{"active_pet":"1234"}"#;
+    let s: AppSettings = serde_json::from_str(json).unwrap();
+    assert_eq!(s.active_pet, Some("1234".into()));
+    assert_eq!(s.scale, None); // serde default for Option is None
+  }
 }
