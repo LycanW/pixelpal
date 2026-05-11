@@ -29,5 +29,10 @@ src-tauri/target/
 # Pet data (user content, not source code)
 pets/
 
+# AI agent files (private, synced via separate private repo)
+AGENTS.md
+AGENTS.en.md
+PROJECT_MEMORY.md
+
 # Claude
 .claude/
