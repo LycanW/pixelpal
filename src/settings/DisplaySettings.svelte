@@ -1,6 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
-  import { emit } from '@tauri-apps/api/event';
+  import { t, i18n, setLanguage, loadLanguage, type Lang } from '../lib/i18n.svelte';
 
   let petsDir = $state('');
   let scale = $state(5);
@@ -15,6 +15,7 @@
       petsDir = await invoke<string>('get_pets_dir');
       scale = await invoke<number>('get_scale');
       alwaysOnTop = await invoke<boolean>('get_always_on_top');
+      await loadLanguage();
     } catch (e) {
       error = `Failed to load settings: ${e instanceof Error ? e.message : e}`;
     } finally {
@@ -26,7 +27,6 @@
     scale = s;
     try {
       await invoke('set_scale', { scale: s });
-      await emit('scale-changed', s);
     } catch (e) {
       console.error('Scale update failed:', e);
     }
@@ -46,7 +46,7 @@
 </script>
 
 <div class="editor-panel">
-  <h2>Display</h2>
+  <h2>{t('display.title')}</h2>
 
   {#if loading}
     <p class="status-message">Loading settings…</p>
@@ -57,12 +57,12 @@
     </div>
   {:else}
     <div class="field">
-      <span class="label">Pets Directory</span>
+      <span class="label">{t('display.petsDir')}</span>
       <div class="path-row"><input readonly value={petsDir} /><span class="path-hint">app-settings.json</span></div>
     </div>
 
     <div class="field">
-      <label class="label" for="scale-range">Pet Scale: {scale}&times;</label>
+      <label class="label" for="scale-range">{t('display.scale')}: {scale}&times;</label>
       <div class="scale-row">
         <input id="scale-range" type="range" min="1" max="10" value={scale} oninput={(e) => { const v = parseInt((e.target as HTMLInputElement).value); if (!isNaN(v)) setScale(v); }} />
         <span class="scale-val">{scale}&times;</span>
@@ -70,11 +70,19 @@
     </div>
 
     <div class="field">
-      <label class="label" for="aot-check">Always on Top</label>
+      <label class="label" for="aot-check">{t('display.alwaysOnTop')}</label>
       <label class="toggle" for="aot-check">
         <input id="aot-check" type="checkbox" checked={alwaysOnTop} onchange={toggleAot} />
         {alwaysOnTop ? 'On' : 'Off'}
       </label>
+    </div>
+
+    <div class="field">
+      <label class="label" for="lang-select">{t('display.language')}</label>
+      <select id="lang-select" bind:value={i18n.currentLang} onchange={(e) => setLanguage((e.target as HTMLSelectElement).value as Lang)}>
+        <option value="zh">中文</option>
+        <option value="en">English</option>
+      </select>
     </div>
   {/if}
 </div>
@@ -96,4 +104,5 @@
   .scale-val { font-size: 16px; font-weight: 600; color: var(--text-primary); min-width: 40px; }
   .toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-primary); }
   .toggle input { width: 18px; height: 18px; }
+  select { padding: 6px 8px; border: 1px solid var(--border-input); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg-secondary); color: var(--text-primary); }
 </style>

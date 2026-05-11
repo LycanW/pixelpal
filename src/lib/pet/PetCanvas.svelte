@@ -1,17 +1,17 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getCurrentWindow, LogicalPosition } from '@tauri-apps/api/window';
+  import { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window';
   import { invoke } from '@tauri-apps/api/core';
   import { AnimationController } from './AnimationController';
   import { StateMachine } from './StateMachine';
   import { render } from './SpriteRenderer';
-  import { loadAnimation, loadGifAnimation } from './SpriteLoader';
+  import { loadAnimation, loadGifAnimation, getFrameMetrics, isGifSprite } from './SpriteLoader';
   import { FRAME_SIZE } from './config';
   import type { PetConfig, PetEvent, GifFrameData } from './types';
 
   let { petId = 'default-cat', scale = 5 }: { petId?: string; scale?: number } = $props();
 
-  let frameSize = $state(FRAME_SIZE);
+
   let mainWindow: ReturnType<typeof getCurrentWindow> | null = null;
 
   let canvas: HTMLCanvasElement;
@@ -50,17 +50,12 @@
     controller.setAnimations(config.animations);
     stateMachine = new StateMachine(config.states, controller, config.defaultState);
     stateMachine.start();
+    lastAction = '';
   }
 
   async function loadPet(id: string) {
     sprites.clear();
     try {
-      try {
-        const mRaw = await invoke<string>('read_json', { id, filename: 'manifest.json' });
-        const m = JSON.parse(mRaw);
-        frameSize = m.frameWidth || FRAME_SIZE;
-      } catch (e) { console.warn('loadPet manifest:', e); }
-
       const raw = await invoke<string>('read_json', { id, filename: 'config.json' });
       config = JSON.parse(raw);
       for (const [name, def] of Object.entries(config.animations)) {
@@ -100,20 +95,66 @@
     animationId = requestAnimationFrame(tick);
   }
 
-  function resizeCanvas() {
-    canvas.width = frameSize * scale;
-    canvas.height = frameSize * scale;
+  function computeSize(action: string) {
+    const animDef = config.animations[action];
+    const sprite = sprites.get(action);
+    if (sprite) {
+      if (isGifSprite(sprite)) {
+        const bitmap = sprite.frames[0];
+        return { w: bitmap.width * scale, h: bitmap.height * scale };
+      } else {
+        const fc = animDef?.frameCount ?? 4;
+        const fpr = animDef?.framesPerRow ?? 2;
+        const { frameWidth, frameHeight } = getFrameMetrics(sprite, fc, fpr);
+        return { w: frameWidth * scale, h: frameHeight * scale };
+      }
+    }
+    return { w: FRAME_SIZE * scale, h: FRAME_SIZE * scale };
+  }
+
+  async function applyResize(w: number, h: number) {
+    if (!ctx) return;
+    if (canvas.width === w && canvas.height === h) return;
+    const oldW = canvas.width;
+    const oldH = canvas.height;
+    canvas.width = w;
+    canvas.height = h;
+    if (!mainWindow) return;
+    try {
+      const factor = await mainWindow.scaleFactor();
+      const pos = await mainWindow.outerPosition();
+      const physCx = pos.x + (oldW * factor) / 2;
+      const physCy = pos.y + (oldH * factor) / 2;
+      const newPhysW = w * factor;
+      const newPhysH = h * factor;
+      await mainWindow.setSize(new LogicalSize(w, h));
+      await mainWindow.setPosition(
+        new LogicalPosition(
+          Math.round((physCx - newPhysW / 2) / factor),
+          Math.round((physCy - newPhysH / 2) / factor),
+        ),
+      );
+    } catch (e) {
+      console.error('resize window:', e);
+    }
   }
 
   $effect(() => {
-    // Reactively resize canvas when scale prop changes (after initial mount)
-    if (ctx) resizeCanvas();
+    if (ready && ctx) {
+      const _scale = scale;
+      const _action = controller.currentAction;
+      const { w, h } = computeSize(_action);
+      if (canvas.width !== w || canvas.height !== h) {
+        applyResize(w, h);
+      }
+    }
   });
 
   onMount(() => {
     ctx = canvas.getContext('2d');
     if (!ctx) return;
-    resizeCanvas();
+    canvas.width = FRAME_SIZE * scale;
+    canvas.height = FRAME_SIZE * scale;
     mainWindow = getCurrentWindow();
 
     init();
@@ -126,6 +167,8 @@
     };
   });
 
+  let lastAction = '';
+
   function tick(now: number) {
     const delta = Math.min(now - lastTime, 100);
     lastTime = now;
@@ -135,6 +178,14 @@
     }
 
     controller.update(delta);
+
+    if (lastAction !== controller.currentAction) {
+      lastAction = controller.currentAction;
+      const { w, h } = computeSize(controller.currentAction);
+      if (canvas.width !== w || canvas.height !== h) {
+        applyResize(w, h);
+      }
+    }
 
     if (ctx) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);

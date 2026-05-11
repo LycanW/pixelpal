@@ -126,6 +126,8 @@ pub fn run() {
       commands::list_pet_images,
       commands::import_pet_image,
       commands::delete_pet_image,
+      commands::get_language,
+      commands::set_language,
     ])
     .plugin(tauri_plugin_dialog::init())
     .setup(|app| {
@@ -137,17 +139,6 @@ pub fn run() {
         )?;
       }
       build_tray(app.handle())?;
-
-      if let Some(window) = app.handle().get_webview_window("main") {
-        if let Ok(Some(monitor)) = window.primary_monitor() {
-          let screen = monitor.size();
-          let win_size = window.outer_size().unwrap();
-          let pad = (screen.width.min(screen.height) / 40).max(8);
-          let x = screen.width.saturating_sub(win_size.width).saturating_sub(pad);
-          let y = screen.height.saturating_sub(win_size.height).saturating_sub(pad);
-          let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
-        }
-      }
 
       Ok(())
     })

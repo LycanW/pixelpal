@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { listen, emit } from '@tauri-apps/api/event';
+  import { t } from '../lib/i18n.svelte';
   import HomeView from './HomeView.svelte';
   import PetDetailView from './PetDetailView.svelte';
   import DisplaySettings from './DisplaySettings.svelte';
@@ -38,7 +39,6 @@
     const newPet = typeof e.payload === 'string' ? e.payload : '';
     if (!newPet) return;
     activePetId = newPet;
-    // If we're viewing a pet detail and the pet changed externally
     if (view === 'detail' && selectedPet && selectedPet !== newPet) {
       if (Object.values(dirtyTabs).some(Boolean)) {
         if (window.confirm(`Pet changed to "${newPet}". Discard unsaved changes?`)) {
@@ -61,13 +61,12 @@
 
 <div class="container">
   <header>
-    <h1>Settings</h1>
+    <h1>{t('settings.title')}</h1>
     <div class="header-actions">
       {#if view === 'detail'}
-        <!-- back handled inside PetDetailView -->
       {:else}
         <button class="gear-btn" onclick={() => { view = view === 'display' ? 'home' : 'display'; }}>
-          {view === 'display' ? '← Pets' : '⚙ Display'}
+          {view === 'display' ? t('settings.back') : t('settings.display')}
         </button>
       {/if}
     </div>

@@ -2,13 +2,11 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { emit } from '@tauri-apps/api/event';
+  import { t } from '../lib/i18n.svelte';
 
   let { petId, onDirtyChange }: { petId: string; onDirtyChange?: (dirty: boolean) => void } = $props();
 
   let name = $state('');
-  let frameWidth = $state(32);
-  let frameHeight = $state(32);
-  let displayScale = $state(5);
   let defaultState = $state('idle');
   let stateNames = $state<string[]>(['idle']);
   let loading = $state(true);
@@ -29,9 +27,6 @@
       const m = JSON.parse(mRaw);
       const c = JSON.parse(cRaw);
       name = m.name || petId;
-      frameWidth = m.frameWidth || 32;
-      frameHeight = m.frameHeight || 32;
-      displayScale = m.displayScale || 5;
       defaultState = c.defaultState || 'idle';
       stateNames = Object.keys(c.states || {});
       clearDirty();
@@ -45,8 +40,7 @@
   async function save() {
     error = null;
     try {
-      // Save manifest
-      const manifest = { name, frameWidth, frameHeight, displayScale };
+      const manifest = { name };
       await invoke('write_json', { id: petId, filename: 'manifest.json', content: JSON.stringify(manifest, null, 2) });
       const cRaw = await invoke<string>('read_json', { id: petId, filename: 'config.json' });
       const cfg = JSON.parse(cRaw);
@@ -63,7 +57,7 @@
 </script>
 
 <div class="editor-panel">
-  <h2>Config — {petId}</h2>
+  <h2>{t('config.title')} — {petId}</h2>
 
   {#if loading}
     <p class="status">Loading…</p>
@@ -71,11 +65,8 @@
     <div class="error-box"><p>{error}</p><button class="btn" onclick={load}>Retry</button></div>
   {:else}
     <div class="fields">
-      <label>Name <input type="text" bind:value={name} oninput={markDirty} /></label>
-      <label>Frame Width <input type="number" bind:value={frameWidth} oninput={markDirty} min={8} max={128} /></label>
-      <label>Frame Height <input type="number" bind:value={frameHeight} oninput={markDirty} min={8} max={128} /></label>
-      <label>Display Scale <input type="number" bind:value={displayScale} oninput={markDirty} min={1} max={10} /></label>
-      <label>Default State
+      <label>{t('config.name')} <input type="text" bind:value={name} oninput={markDirty} /></label>
+      <label>{t('config.defaultState')}
         <select bind:value={defaultState} onchange={markDirty}>
           {#each stateNames as state}<option value={state}>{state}</option>{/each}
         </select>
@@ -87,7 +78,7 @@
     {/if}
 
     {#if dirty}
-      <button class="btn" onclick={save}>Save Changes</button>
+      <button class="btn" onclick={save}>{t('config.save')}</button>
     {/if}
   {/if}
 </div>

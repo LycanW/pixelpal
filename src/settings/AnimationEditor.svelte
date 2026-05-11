@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { emit } from '@tauri-apps/api/event';
+  import { t } from '../lib/i18n.svelte';
   import type { AnimationDef } from '../lib/pet/types';
 
   let { petId, onDirtyChange }: { petId: string; onDirtyChange?: (dirty: boolean) => void } = $props();
@@ -181,17 +182,17 @@
 
 <div class="editor-panel">
   <div class="header">
-    <h2>Animations</h2>
+    <h2>{t('animation.title')}</h2>
     {#if addForm}
       <div class="inline-add">
-        <input type="text" bind:value={newName} placeholder="animation name" />
+        <input type="text" bind:value={newName} placeholder={t('animation.name')} />
         <button class="btn" onclick={add} disabled={!newName.trim()}>+</button>
-        <button class="btn subtle" onclick={doImportImage}>Import Image</button>
-        <button class="btn subtle" onclick={() => { addForm = false; }}>Cancel</button>
+        <button class="btn subtle" onclick={doImportImage}>{t('animation.import')}</button>
+        <button class="btn subtle" onclick={() => { addForm = false; }}>{t('home.cancel')}</button>
       </div>
     {:else}
-      <button class="btn" onclick={() => { addForm = true; }}>+ Add</button>
-      <button class="btn subtle" onclick={doImportImage}>Import Image</button>
+      <button class="btn" onclick={() => { addForm = true; }}>{t('animation.add')}</button>
+      <button class="btn subtle" onclick={doImportImage}>{t('animation.import')}</button>
     {/if}
   </div>
 
@@ -200,18 +201,18 @@
   {:else if error && !dirty}
     <div class="error-box"><p>{error}</p><button class="btn" onclick={load}>Retry</button></div>
   {:else if Object.keys(animations).length === 0}
-    <p class="empty">No animations. Click "+ Add" to create one.</p>
+    <p class="empty">{t('animation.empty')}</p>
   {:else}
     <div class="table-wrap">
       <div class="table">
         <div class="row hdr">
-          <span class="nm">Name</span>
-          <span class="src">Source</span>
-          <span class="ft">Frame (ms)</span>
-          <span class="fc">Frames</span>
-          <span class="fpr">Per Row</span>
-          <span class="lp">Loop</span>
-          <span class="du">Duration</span>
+          <span class="nm">{t('animation.name')}</span>
+          <span class="src">{t('animation.source')}</span>
+          <span class="ft">{t('animation.frameTime')}</span>
+          <span class="fc">{t('animation.frames')}</span>
+          <span class="fpr">{t('animation.perRow')}</span>
+          <span class="lp">{t('animation.loop')}</span>
+          <span class="du">{t('animation.duration')}</span>
           <span></span>
         </div>
         {#each Object.entries(animations) as [name, anim]}
@@ -238,29 +239,29 @@
   {/if}
 
   {#if dirty && !loading}
-    <button class="btn" onclick={save}>Save Changes</button>
+    <button class="btn" onclick={save}>{t('animation.save')}</button>
   {/if}
 
   <section class="assets">
     <div class="asset-header">
-      <h2>Image Assets</h2>
-      <button class="btn subtle" onclick={doImportImage}>Import Image</button>
+      <h2>{t('animation.assets')}</h2>
+      <button class="btn subtle" onclick={doImportImage}>{t('animation.import')}</button>
     </div>
     {#if imageFiles.length === 0}
-      <p class="empty">No image files.</p>
+      <p class="empty">{t('animation.noImages')}</p>
     {:else}
       <div class="asset-table">
         <div class="asset-row hdr">
-          <span>File</span>
-          <span>Usage</span>
+          <span>{t('animation.file')}</span>
+          <span>{t('animation.usage')}</span>
           <span></span>
         </div>
         {#each imageFiles as file}
           {@const usage = usedBy(file)}
           <div class="asset-row">
             <span class="file-name">{file}</span>
-            <span class:unused={usage.length === 0}>{usage.length ? `Used by: ${usage.join(', ')}` : 'Unused'}</span>
-            <button class="btn subtle" onclick={() => deleteUnusedImage(file)} disabled={usage.length > 0}>Delete file</button>
+            <span class:unused={usage.length === 0}>{usage.length ? `Used by: ${usage.join(', ')}` : t('animation.unused')}</span>
+            <button class="btn subtle" onclick={() => deleteUnusedImage(file)} disabled={usage.length > 0}>{t('animation.deleteFile')}</button>
           </div>
         {/each}
       </div>

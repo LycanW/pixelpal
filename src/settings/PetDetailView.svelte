@@ -5,13 +5,15 @@
 
   let { petId, onBack, onDirtyChange }: { petId: string; onBack: () => void; onDirtyChange?: (d: Record<string, boolean>) => void } = $props();
 
+  import { t } from '../lib/i18n.svelte';
+
   let tab = $state('interactions');
   let dirtyTabs = $state<Record<string, boolean>>({});
 
   const tabs = [
-    { id: 'interactions', label: 'Interactions' },
-    { id: 'animations', label: 'Animations' },
-    { id: 'config', label: 'Config' },
+    { id: 'interactions', label: t('detail.interactions') },
+    { id: 'animations', label: t('detail.animations') },
+    { id: 'config', label: t('detail.config') },
   ];
 
   function setDirty(t: string, d: boolean) {
@@ -39,7 +41,7 @@
 
 <div class="detail">
   <div class="top-bar">
-    <button class="back-btn" onclick={handleBack}>← Back to pets</button>
+    <button class="back-btn" onclick={handleBack}>{t('detail.back')}</button>
     <span class="pet-name">{petId}</span>
   </div>
 

@@ -9,6 +9,7 @@ pub struct AppSettings {
   pub active_pet: Option<String>,
   pub always_on_top: Option<bool>,
   pub scale: Option<u32>,
+  pub language: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -18,6 +19,7 @@ impl Default for AppSettings {
       active_pet: Some("default-cat".into()),
       always_on_top: Some(true),
       scale: Some(5),
+      language: Some("zh".into()),
     }
   }
 }
@@ -282,7 +284,19 @@ pub fn set_scale(app: tauri::AppHandle, state: tauri::State<AppState>, scale: u3
 }
 
 #[tauri::command]
-pub fn create_pet(state: tauri::State<AppState>, name: String, frame_size: u32, display_scale: u32) -> Result<(), String> {
+pub fn get_language(state: tauri::State<AppState>) -> String {
+  state.settings.lock().unwrap_or_else(|e| e.into_inner()).language.clone().unwrap_or_else(|| "zh".into())
+}
+
+#[tauri::command]
+pub fn set_language(state: tauri::State<AppState>, lang: String) {
+  let mut settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
+  settings.language = Some(lang);
+  save_settings(&settings);
+}
+
+#[tauri::command]
+pub fn create_pet(state: tauri::State<AppState>, name: String, _frame_size: u32, _display_scale: u32) -> Result<(), String> {
   sanitize_pet_id(&name)?;
   let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
   let dir = resolve_pets_dir(&settings).join(&name);
@@ -292,11 +306,6 @@ pub fn create_pet(state: tauri::State<AppState>, name: String, frame_size: u32, 
     "name": name,
     "version": "1.0.0",
     "author": "",
-    "frameWidth": frame_size,
-    "frameHeight": frame_size,
-    "displayScale": display_scale,
-    "windowWidth": frame_size * display_scale,
-    "windowHeight": frame_size * display_scale,
   });
   std::fs::write(
     dir.join("manifest.json"),

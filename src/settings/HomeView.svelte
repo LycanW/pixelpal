@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { t } from '../lib/i18n.svelte';
   import PetCard from './PetCard.svelte';
 
   let {
@@ -18,8 +19,6 @@
   let error = $state<string | null>(null);
   let showCreate = $state(false);
   let newName = $state('');
-  let newFrameSize = $state(32);
-  let newScale = $state(5);
 
   async function loadPets() {
     loading = true;
@@ -33,7 +32,7 @@
     const name = newName.trim();
     if (!name) return;
     try {
-      await invoke('create_pet', { name, frameSize: newFrameSize, displayScale: newScale });
+      await invoke('create_pet', { name, frameSize: 32, displayScale: 5 });
       showCreate = false;
       newName = '';
       loadPets();
@@ -52,23 +51,21 @@
 
 <div class="home">
   <div class="toolbar">
-    <h2>Pets</h2>
+    <h2>{t('home.title')}</h2>
     <div class="toolbar-actions">
-      <button class="btn" onclick={() => { showCreate = true; }}>+ New</button>
-      <button class="btn subtle" onclick={doImport}>Import</button>
+      <button class="btn" onclick={() => { showCreate = true; }}>{t('home.new')}</button>
+      <button class="btn subtle" onclick={doImport}>{t('home.import')}</button>
     </div>
   </div>
 
   {#if showCreate}
     <div class="modal-overlay" onclick={() => { showCreate = false; }} role="presentation">
       <div class="modal" onclick={(e: MouseEvent) => e.stopPropagation()} role="dialog">
-        <h3>New Pet</h3>
-        <label>Name <input type="text" bind:value={newName} placeholder="my-pet" /></label>
-        <label>Frame size <input type="number" bind:value={newFrameSize} min={16} max={64} /></label>
-        <label>Display scale <input type="number" bind:value={newScale} min={1} max={10} /></label>
+        <h3>{t('home.newPet')}</h3>
+        <label>{t('home.name')} <input type="text" bind:value={newName} placeholder="my-pet" /></label>
         <div class="modal-actions">
-          <button class="btn" onclick={doCreate} disabled={!newName.trim()}>Create</button>
-          <button class="btn subtle" onclick={() => { showCreate = false; }}>Cancel</button>
+          <button class="btn" onclick={doCreate} disabled={!newName.trim()}>{t('home.create')}</button>
+          <button class="btn subtle" onclick={() => { showCreate = false; }}>{t('home.cancel')}</button>
         </div>
       </div>
     </div>
@@ -83,7 +80,7 @@
   {:else if error}
     <div class="error-box"><p>{error}</p><button class="btn" onclick={loadPets}>Retry</button></div>
   {:else if pets.length === 0}
-    <p class="empty">No pets. Create one or import from folder.</p>
+    <p class="empty">{t('home.noPets')}</p>
   {:else}
     <div class="grid">
       {#each pets as id}
@@ -93,7 +90,7 @@
             {id}
             <span class="gear-icon" role="button" tabindex="0" onclick={(e: MouseEvent) => { e.stopPropagation(); onSettingsPet(id); }} onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') { e.stopPropagation(); onSettingsPet(id); } }} title="Settings">⚙</span>
           </span>
-          {#if id === activePetId}<span class="badge">active</span>{/if}
+          {#if id === activePetId}<span class="badge">{t('home.active')}</span>{/if}
         </button>
       {/each}
     </div>

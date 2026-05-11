@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { emit, listen } from '@tauri-apps/api/event';
+  import { t } from '../lib/i18n.svelte';
   import type { PetEvent, StateConfig } from '../lib/pet/types';
 
   let { petId, onDirtyChange }: { petId: string; onDirtyChange?: (dirty: boolean) => void } = $props();
@@ -208,8 +209,8 @@
 
 <div class="editor-panel">
   <div class="header">
-    <h2>Interactions</h2>
-    <button class="btn" onclick={addState}>+ Add State</button>
+    <h2>{t('state.title')}</h2>
+    <button class="btn" onclick={addState}>{t('state.add')}</button>
   </div>
 
   {#if loading}
@@ -230,7 +231,7 @@
             </div>
           </div>
 
-          <label class="entry">Entry Animation
+          <label class="entry">{t('state.entry')}
             <select value={state.entry} onchange={(e) => updateEntry(name, (e.target as HTMLSelectElement).value)}>
               {#each animationNames as anim}<option value={anim}>{anim}</option>{/each}
               {#if !animationNames.includes(state.entry)}<option value={state.entry}>{state.entry}</option>{/if}
@@ -238,18 +239,18 @@
           </label>
 
           <div class="transitions-head">
-            <span>Transitions</span>
-            <button class="btn subtle" onclick={() => addTransition(name)} disabled={!firstAvailableEvent(state)}>+ Add Transition</button>
+            <span>{t('state.transitions')}</span>
+            <button class="btn subtle" onclick={() => addTransition(name)} disabled={!firstAvailableEvent(state)}>{t('state.addTransition')}</button>
           </div>
 
           {#if Object.keys(state.transitions).length === 0}
-            <p class="empty">No transitions.</p>
+            <p class="empty">{t('state.noTransitions')}</p>
           {:else}
             <div class="table">
               <div class="row hdr">
-                <span>Event</span>
-                <span>Target State</span>
-                <span>Override Animation</span>
+                <span>{t('state.event')}</span>
+                <span>{t('state.target')}</span>
+                <span>{t('state.override')}</span>
                 <span></span>
               </div>
               {#each Object.entries(state.transitions) as [event, transition]}
@@ -263,7 +264,7 @@
                     {#each stateNames as stateName}<option value={stateName}>{stateName}</option>{/each}
                   </select>
                   <select value={transition.animation ?? ''} onchange={(e) => updateTransitionAnimation(name, event as PetEvent, (e.target as HTMLSelectElement).value)}>
-                    <option value="">Use target entry</option>
+                    <option value="">{t('state.useTarget')}</option>
                     {#each animationNames as anim}<option value={anim}>{anim}</option>{/each}
                     {#if transition.animation && !animationNames.includes(transition.animation)}<option value={transition.animation}>{transition.animation}</option>{/if}
                   </select>

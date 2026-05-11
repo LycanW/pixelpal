@@ -15,8 +15,6 @@
       if (typeof s === 'number' && s >= 1 && s <= 10) scale = s;
     } catch (e) { console.error('init:', e); }
 
-    await emit('pet-changed', petId);
-
     const { listen } = await import('@tauri-apps/api/event');
     const unlisten = listen<number>('scale-changed', (e) => {
       if (typeof e.payload === 'number' && e.payload >= 1 && e.payload <= 10) {
