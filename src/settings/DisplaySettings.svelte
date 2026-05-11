@@ -6,6 +6,7 @@
   let scale = $state(5);
   let alwaysOnTop = $state(true);
   let autostart = $state(false);
+  let isWayland = $state(false);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
@@ -17,6 +18,8 @@
       scale = await invoke<number>('get_scale');
       alwaysOnTop = await invoke<boolean>('get_always_on_top');
       autostart = await invoke<boolean>('get_autostart');
+      const info = await invoke<{ is_wayland: boolean }>('get_platform_info');
+      isWayland = info.is_wayland;
       await loadLanguage();
     } catch (e) {
       error = `Failed to load settings: ${e instanceof Error ? e.message : e}`;
@@ -79,14 +82,20 @@
         <input id="scale-range" type="range" min="1" max="10" value={scale} oninput={(e) => { const v = parseInt((e.target as HTMLInputElement).value); if (!isNaN(v)) setScale(v); }} />
         <span class="scale-val">{scale}&times;</span>
       </div>
+      {#if isWayland}
+        <span class="hint">{t('display.waylandScaleHint')}</span>
+      {/if}
     </div>
 
     <div class="field">
       <label class="label" for="aot-check">{t('display.alwaysOnTop')}</label>
       <label class="toggle" for="aot-check">
-        <input id="aot-check" type="checkbox" checked={alwaysOnTop} onchange={toggleAot} />
+        <input id="aot-check" type="checkbox" checked={alwaysOnTop} onchange={toggleAot} disabled={isWayland} />
         {alwaysOnTop ? 'On' : 'Off'}
       </label>
+      {#if isWayland}
+        <span class="hint">Wayland: always-on-top may not be supported by your compositor</span>
+      {/if}
     </div>
 
     <div class="field">
@@ -108,7 +117,6 @@
 </div>
 
 <style>
-  .editor-panel { }
   h2 { font-size: 15px; margin: 0 0 14px; color: var(--text-primary); }
   .field { margin-bottom: 18px; }
   .field .label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: var(--text-primary); }
@@ -124,5 +132,6 @@
   .scale-val { font-size: 16px; font-weight: 600; color: var(--text-primary); min-width: 40px; }
   .toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--text-primary); }
   .toggle input { width: 18px; height: 18px; }
+  .hint { display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
   select { padding: 6px 8px; border: 1px solid var(--border-input); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg-secondary); color: var(--text-primary); }
 </style>
