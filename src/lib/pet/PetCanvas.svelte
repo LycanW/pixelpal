@@ -167,9 +167,19 @@
 
     if (ctx) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const sprite = sprites.get(controller.currentAction);
-      const animDef = config.animations[controller.currentAction];
-      if (sprite) render(ctx, sprite, controller.frameIndex, animDef);
+      if (!petId) {
+        ctx.fillStyle = '#888';
+        ctx.font = `${10 * scale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('未找到宠物', canvas.width / 2, canvas.height / 2 - 6 * scale);
+        ctx.font = `${8 * scale}px sans-serif`;
+        ctx.fillText('请在设置中添加', canvas.width / 2, canvas.height / 2 + 8 * scale);
+      } else {
+        const sprite = sprites.get(controller.currentAction);
+        const animDef = config.animations[controller.currentAction];
+        if (sprite) render(ctx, sprite, controller.frameIndex, animDef);
+      }
     }
 
     if (grabbing && mainWindow) {
