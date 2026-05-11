@@ -60,7 +60,7 @@
 
   {#if showCreate}
     <div class="modal-overlay" onclick={() => { showCreate = false; }} role="presentation">
-      <div class="modal" onclick={(e: MouseEvent) => e.stopPropagation()} role="dialog">
+      <div class="modal" onclick={(e: MouseEvent) => e.stopPropagation()} role="dialog" tabindex="-1" onkeydown={(e: KeyboardEvent) => { if (e.key === 'Escape') showCreate = false; }}>
         <h3>{t('home.newPet')}</h3>
         <label>{t('home.name')} <input type="text" bind:value={newName} placeholder="my-pet" /></label>
         <div class="modal-actions">
@@ -98,7 +98,6 @@
 </div>
 
 <style>
-  .home { }
   .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   h2 { font-size: 15px; margin: 0; color: var(--text-primary); }
   .toolbar-actions { display: flex; gap: 6px; }
