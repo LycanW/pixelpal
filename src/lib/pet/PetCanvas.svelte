@@ -5,7 +5,7 @@
   import { AnimationController } from './AnimationController';
   import { StateMachine } from './StateMachine';
   import { render } from './SpriteRenderer';
-  import { loadAnimation, loadGifAnimation, getFrameMetrics, isGifSprite } from './SpriteLoader';
+  import { loadAnimation, loadGifAnimation } from './SpriteLoader';
   import { FRAME_SIZE } from './config';
   import type { PetConfig, PetEvent, GifFrameData } from './types';
 
@@ -95,20 +95,7 @@
     animationId = requestAnimationFrame(tick);
   }
 
-  function computeSize(action: string) {
-    const animDef = config.animations[action];
-    const sprite = sprites.get(action);
-    if (sprite) {
-      if (isGifSprite(sprite)) {
-        const bitmap = sprite.frames[0];
-        return { w: bitmap.width * scale, h: bitmap.height * scale };
-      } else {
-        const fc = animDef?.frameCount ?? 4;
-        const fpr = animDef?.framesPerRow ?? 2;
-        const { frameWidth, frameHeight } = getFrameMetrics(sprite, fc, fpr);
-        return { w: frameWidth * scale, h: frameHeight * scale };
-      }
-    }
+  function computeSize() {
     return { w: FRAME_SIZE * scale, h: FRAME_SIZE * scale };
   }
 
@@ -142,8 +129,7 @@
   $effect(() => {
     if (ready && ctx) {
       const _scale = scale;
-      const _action = controller.currentAction;
-      const { w, h } = computeSize(_action);
+      const { w, h } = computeSize();
       if (canvas.width !== w || canvas.height !== h) {
         applyResize(w, h);
       }
@@ -178,14 +164,6 @@
     }
 
     controller.update(delta);
-
-    if (lastAction !== controller.currentAction) {
-      lastAction = controller.currentAction;
-      const { w, h } = computeSize(controller.currentAction);
-      if (canvas.width !== w || canvas.height !== h) {
-        applyResize(w, h);
-      }
-    }
 
     if (ctx) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
