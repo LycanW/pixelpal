@@ -12,6 +12,12 @@ html, body, #app {
   user-select: none;
 }
 
+#app {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 canvas {
   display: block;
 }

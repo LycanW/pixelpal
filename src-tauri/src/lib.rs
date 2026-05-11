@@ -131,6 +131,7 @@ pub fn run() {
       commands::set_language,
       commands::get_autostart,
       commands::set_autostart,
+      commands::get_platform_info,
     ])
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_autostart::init(

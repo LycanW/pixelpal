@@ -323,6 +323,15 @@ pub fn set_autostart(app: tauri::AppHandle, state: tauri::State<AppState>, on: b
 }
 
 #[tauri::command]
+pub fn get_platform_info() -> serde_json::Value {
+  let is_wayland = std::env::var("WAYLAND_DISPLAY").is_ok();
+  serde_json::json!({
+    "is_wayland": is_wayland,
+    "is_linux": cfg!(target_os = "linux"),
+  })
+}
+
+#[tauri::command]
 pub fn create_pet(state: tauri::State<AppState>, name: String, _frame_size: u32, _display_scale: u32) -> Result<(), String> {
   sanitize_pet_id(&name)?;
   let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());

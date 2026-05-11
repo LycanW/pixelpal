@@ -35,6 +35,14 @@
   let targetY = 0;
   let skipNextClick = false;
   let ready = $state(false);
+  let isWayland = false;
+  let resizeObserver: ResizeObserver | null = null;
+
+  let canvasStyle = $derived(
+    isWayland
+      ? `width: ${FRAME_SIZE * scale}px; height: ${FRAME_SIZE * scale}px; cursor: grab;`
+      : 'width: 100%; height: 100%; cursor: grab;'
+  );
 
   $effect(() => {
     if (ready && petId) {
@@ -79,6 +87,11 @@
   }
 
   async function init() {
+    try {
+      const info = await invoke<{ is_wayland: boolean }>('get_platform_info');
+      isWayland = info.is_wayland;
+    } catch (e) { console.error('get_platform_info:', e); }
+
     const { listen } = await import('@tauri-apps/api/event');
     unlistenPetChanged = await listen('pet-changed', async (e) => {
       if (typeof e.payload === 'string') {
@@ -100,27 +113,25 @@
   }
 
   async function applyResize(w: number, h: number) {
-    if (!ctx) return;
-    if (canvas.width === w && canvas.height === h) return;
-    const oldW = canvas.width;
-    const oldH = canvas.height;
-    canvas.width = w;
-    canvas.height = h;
     if (!mainWindow) return;
     try {
-      const factor = await mainWindow.scaleFactor();
-      const pos = await mainWindow.outerPosition();
-      const physCx = pos.x + (oldW * factor) / 2;
-      const physCy = pos.y + (oldH * factor) / 2;
-      const newPhysW = w * factor;
-      const newPhysH = h * factor;
       await mainWindow.setSize(new LogicalSize(w, h));
-      await mainWindow.setPosition(
-        new LogicalPosition(
-          Math.round((physCx - newPhysW / 2) / factor),
-          Math.round((physCy - newPhysH / 2) / factor),
-        ),
-      );
+      if (!isWayland) {
+        const factor = await mainWindow.scaleFactor();
+        const pos = await mainWindow.outerPosition();
+        const oldW = canvas.width;
+        const oldH = canvas.height;
+        const physCx = pos.x + (oldW * factor) / 2;
+        const physCy = pos.y + (oldH * factor) / 2;
+        const newPhysW = w * factor;
+        const newPhysH = h * factor;
+        await mainWindow.setPosition(
+          new LogicalPosition(
+            Math.round((physCx - newPhysW / 2) / factor),
+            Math.round((physCy - newPhysH / 2) / factor),
+          ),
+        );
+      }
     } catch (e) {
       console.error('resize window:', e);
     }
@@ -139,9 +150,23 @@
   onMount(() => {
     ctx = canvas.getContext('2d');
     if (!ctx) return;
-    canvas.width = FRAME_SIZE * scale;
-    canvas.height = FRAME_SIZE * scale;
     mainWindow = getCurrentWindow();
+
+    resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        const w = Math.max(1, Math.round(width));
+        const h = Math.max(1, Math.round(height));
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+      }
+    });
+    resizeObserver.observe(canvas);
+
+    const initialSize = FRAME_SIZE * scale;
+    mainWindow.setSize(new LogicalSize(initialSize, initialSize)).catch(() => {});
 
     init();
 
@@ -150,6 +175,7 @@
     return () => {
       cancelAnimationFrame(animationId);
       unlistenPetChanged?.();
+      resizeObserver?.disconnect();
     };
   });
 
@@ -182,10 +208,8 @@
       }
     }
 
-    if (grabbing && mainWindow) {
-      mainWindow.setPosition(
-        new LogicalPosition(targetX, targetY)
-      );
+    if (grabbing && mainWindow && !isWayland) {
+      mainWindow.setPosition(new LogicalPosition(targetX, targetY)).catch(() => {});
     }
 
     animationId = requestAnimationFrame(tick);
@@ -213,11 +237,10 @@
       return;
     }
     if (grabbing) {
-      // Track target position — tick() applies it via setPosition each frame.
-      // Unlike startDragging(), this doesn't block the JS thread,
-      // so rAF fires normally and the walk animation keeps playing.
-      targetX = e.screenX - dragOffX;
-      targetY = e.screenY - dragOffY;
+      if (!isWayland) {
+        targetX = e.screenX - dragOffX;
+        targetY = e.screenY - dragOffY;
+      }
       return;
     }
     // Only left button (bit 0) starts a drag; middle/right just click.
@@ -233,6 +256,9 @@
       targetY = e.screenY - dragOffY;
       dispatch('press');
       dispatch('drag_start');
+      if (isWayland && mainWindow) {
+        mainWindow.startDragging().catch(() => {});
+      }
     }
   }
 
@@ -279,5 +305,5 @@
   onclick={handleClick}
   ondblclick={handleDblClick}
   oncontextmenu={handleContextMenu}
-  style="width: 100%; height: 100%; cursor: grab;"
+  style={canvasStyle}
 ></canvas>
