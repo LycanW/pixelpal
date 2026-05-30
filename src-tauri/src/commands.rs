@@ -12,6 +12,8 @@ pub struct AppSettings {
   pub scale: Option<u32>,
   pub language: Option<String>,
   pub autostart: Option<bool>,
+  pub ai_base_url: Option<String>,
+  pub ai_api_key: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -23,6 +25,8 @@ impl Default for AppSettings {
       scale: Some(5),
       language: Some("zh".into()),
       autostart: Some(false),
+      ai_base_url: None,
+      ai_api_key: None,
     }
   }
 }
@@ -746,6 +750,8 @@ mod tests {
       scale: Some(3),
       language: Some("en".into()),
       autostart: Some(true),
+      ai_base_url: None,
+      ai_api_key: None,
     };
     let json = serde_json::to_string_pretty(&original).unwrap();
     let restored: AppSettings = serde_json::from_str(&json).unwrap();
