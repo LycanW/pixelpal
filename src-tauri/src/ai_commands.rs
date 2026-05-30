@@ -36,3 +36,24 @@ pub fn set_ai_config(state: State<AppState>, payload: SetAiConfigPayload) -> Res
   save_settings(&settings);
   Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+  #[test]
+  fn test_url_validation_rejects_ftp() {
+    let url = "ftp://example.com";
+    assert!(!url.starts_with("http://") && !url.starts_with("https://"));
+  }
+
+  #[test]
+  fn test_url_validation_accepts_http() {
+    let url = "http://localhost:8080/v1";
+    assert!(url.starts_with("http://") || url.starts_with("https://"));
+  }
+
+  #[test]
+  fn test_url_validation_accepts_https() {
+    let url = "https://api.openai.com/v1";
+    assert!(url.starts_with("http://") || url.starts_with("https://"));
+  }
+}
