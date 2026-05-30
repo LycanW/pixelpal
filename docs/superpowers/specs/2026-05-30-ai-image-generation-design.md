@@ -17,41 +17,44 @@
 用户描述角色
     │
     ├─→ Step 1: 生成 Base 角色
-    │    [generate_base(description, frame_size)]
+    │    [generate_base(description)]
     │    │
     │    ▼
     │  HTTP POST /v1/images/generations
     │    │
     │    ▼
-    │  返回 32x32 base 帧 PNG
+    │  返回 1024x1024 base 图 PNG
     │    │
     │    ▼
-    │  用户预览 base 帧 → 满意？继续 / 不满意？重试
+    │  用户预览 base 图 → 满意？继续 / 不满意？重试
     │    │
     │    ▼
     │  Rust 提取角色特征描述（颜色、外形）
     │    │
     ├─→ Step 2: 生成完整 Spritesheet
-    │    [generate_spritesheet(base_desc, frame_count, frames_per_row, frame_size)]
+    │    [generate_spritesheet(base_desc, animation_name, frame_count, frames_per_row)]
     │    │
     │    ▼
     │  HTTP POST /v1/images/generations（prompt 锁定 base 描述）
     │    │
     │    ▼
-    │  返回完整 spritesheet PNG
+    │  返回 1024x1024 spritesheet PNG
     │    │
     │    ▼
-    │  Rust 后端图像后处理（缩放、透明化）
+    │  Rust 后端图像后处理（透明化、颜色量化）
     │    │
     │    ▼
     ▼
-前端预览弹窗（裁剪区域 + 帧预览）
+前端预览弹窗（自由裁剪区域 + 帧预览）
     │
     ▼
-用户确认 → [save_ai_sprite(...)] → 保存 PNG
+用户确认 → [save_ai_sprite(...)] → 保存 PNG（保持原始分辨率）
     │
     ▼
 自动创建/更新动画定义（frameCount, framesPerRow, source）
+    │
+    ▼
+PixelPal displayScale 负责渲染缩放
 ```
 
 ## Rust 后端
@@ -78,8 +81,8 @@ pub struct AppSettings {
 |------|------|--------|------|
 | `get_ai_config` | — | `{ base_url: String, has_key: bool }` | 不返回 key 本身 |
 | `set_ai_config` | `{ base_url: String, api_key: String }` | `Result<(), String>` | 验证 URL 格式 |
-| `generate_base` | `{ description: String, frame_size: u32 }` | `Result<String, String>` | Step 1：生成角色 base 帧，返回 base64 PNG |
-| `generate_spritesheet` | `{ base_description: String, animation_name: String, frame_count: u32, frames_per_row: u32, frame_size: u32 }` | `Result<String, String>` | Step 2：以 base 描述为锚点生成 spritesheet，返回后处理后的 base64 PNG |
+| `generate_base` | `{ description: String }` | `Result<String, String>` | Step 1：生成角色 base 图（1024x1024），返回 base64 PNG |
+| `generate_spritesheet` | `{ base_description: String, animation_name: String, frame_count: u32, frames_per_row: u32 }` | `Result<String, String>` | Step 2：以 base 描述为锚点生成 spritesheet（1024x1024），返回后处理后的 base64 PNG |
 | `save_ai_sprite` | `{ pet_id: String, filename: String, base64: String, crop_x: u32, crop_y: u32, crop_w: u32, crop_h: u32 }` | `Result<(), String>` | 按裁剪参数截取并保存 PNG 到宠物目录 |
 
 #### Step 1: `generate_base` 实现细节
@@ -88,7 +91,7 @@ pub struct AppSettings {
    ```json
    {
      "model": "gpt-image-1",
-     "prompt": "A pixel-art character standing front-facing: {description}. Transparent background. {frame_size}x{frame_size} pixels. Centered, full body visible. Clean crisp pixel edges.",
+     "prompt": "A pixel-art character standing front-facing: {description}. Transparent background. Centered, full body visible. Clean crisp pixel edges. Game-asset style.",
      "size": "1024x1024",
      "quality": "high",
      "n": 1
@@ -97,10 +100,10 @@ pub struct AppSettings {
 
 2. **发送 HTTP 请求**，超时 60 秒
 3. **解析响应**：提取 `data[0].b64_json`
-4. **后处理**：缩放到 `frame_size × frame_size`，透明化
-5. **返回 base64 data URL**
+4. **后处理**：透明化（见下方"后端图像后处理"章节）
+5. **返回 base64 data URL**（保持 1024x1024 分辨率）
 
-**base 帧的作用**：
+**base 图的作用**：
 - 让用户先看到角色长什么样，满意再继续
 - 提取角色特征描述（颜色、外形），作为 Step 2 的锚点
 - 防止"生成完发现角色完全不对"的浪费
@@ -111,7 +114,7 @@ pub struct AppSettings {
    ```json
    {
      "model": "gpt-image-1",
-     "prompt": "Sprite sheet of EXACTLY the same character: {base_description}. {animation_name} animation, {frame_count} frames arranged in {rows}x{cols} grid, {frame_size}x{frame_size} per frame. CRITICAL: Same colors, proportions, art style in ALL frames. Transparent background. Clean crisp pixel edges. Game-asset style.",
+     "prompt": "Sprite sheet of EXACTLY the same character: {base_description}. {animation_name} animation, {frame_count} frames arranged in a {rows}x{cols} grid. CRITICAL: Same colors, proportions, art style in ALL frames. Transparent background. Clean crisp pixel edges. Pixel-art game-asset style.",
      "size": "1024x1024",
      "quality": "high",
      "n": 1
@@ -121,7 +124,7 @@ pub struct AppSettings {
 2. **发送 HTTP 请求**，超时 60 秒
 3. **解析响应**：提取 `data[0].b64_json`
 4. **图像后处理**（见下方"后端图像后处理"章节）
-5. **返回 base64 data URL**
+5. **返回 base64 data URL**（保持 1024x1024 分辨率）
 
 ### 依赖变更
 
@@ -159,7 +162,6 @@ Model:    gpt-image-1 (固定，提示文字说明)
 
 Step 1 — 生成角色：
 描述: [一只橙色的像素小猫，会眨眼]
-帧尺寸: [32] px
 
 [生成角色预览]
 
@@ -174,14 +176,14 @@ Step 2 — 生成动画：
 ```
 
 流程：
-1. 用户输入描述，确认帧尺寸
+1. 用户输入描述
 2. **Step 1** 调用 `generate_base`
-3. 显示 base 帧预览，用户确认角色外观
+3. 显示 base 图预览，用户确认角色外观
 4. **Step 2** 调用 `generate_spritesheet`
 5. 弹出预览弹窗，用户可微调裁剪
 6. 确认后：
-   - 创建宠物目录（现有 `create_pet`）
-   - 保存 PNG 为 `{petId}/idle.png`
+   - 创建宠物目录（现有 `create_pet`，frame_size 设为 32 作为默认值）
+   - 保存 PNG 为 `{petId}/idle.png`（保持 1024x1024 分辨率）
    - 写入 `config.json`：
      ```json
      {
@@ -243,10 +245,11 @@ AI 生成的图片不保证精确遵守网格约束。Rust 后端在返回前进
 ### 处理流水线
 
 1. **解码** — 将 base64/下载的 PNG 解码为 `image::DynamicImage`
-2. **缩放** — 缩放到 `frame_size × frames_per_row` 的精确目标尺寸
-3. **背景透明化** — 检测图像四角的平均颜色，将接近该颜色的像素设为透明（处理 AI 生成的纯色背景）
-4. **颜色量化**（可选）— 限制为 16 色板，增强像素风效果
-5. **编码** — 输出为 base64 PNG
+2. **背景透明化** — 检测图像四角的平均颜色，将接近该颜色的像素设为透明（处理 AI 生成的纯色背景）
+3. **颜色量化**（可选）— 限制为 16 色板，增强像素风效果
+4. **编码** — 输出为 base64 PNG（保持 1024x1024 分辨率）
+
+> **不强制缩放**：AI 生成 1024x1024，保持原始分辨率保存。`SpriteRenderer` 的 `imageSmoothingEnabled = false` 配合 `displayScale` 负责渲染时的像素感，无需后端缩放到小尺寸。
 
 ### 透明化算法
 
@@ -317,12 +320,13 @@ AI 生成后**不直接保存**，而是弹出预览弹窗让用户确认：
   - Rust 后端按裁剪参数截取图像、保存为 PNG
   - 前端更新 `config.json` 动画定义
 
-### 裁剪参数默认值
+### 裁剪参数
 
-Rust 后端后处理后，前端默认裁剪参数为：
-- `crop_x = 0, crop_y = 0`
-- `crop_w = frame_size * frames_per_row`
-- `crop_h = frame_size * ceil(frame_count / frames_per_row)`
+用户通过预览弹窗自由调整裁剪区域：
+- `crop_x`, `crop_y` — 起始位置
+- `crop_w`, `crop_h` — 裁剪宽高
+
+> 不再受 `frame_size` 硬约束。用户看到什么裁剪什么，`frameCount` 和 `framesPerRow` 决定渲染时如何切分这张裁剪后的图。
 
 ## 关键设计决策
 
@@ -342,31 +346,31 @@ Rust 后端后处理后，前端默认裁剪参数为：
 
 后处理解决几何问题：
 - 背景透明化（AI 常生成浅灰/白色背景而非透明）
-- 精确缩放到目标像素尺寸
 - 颜色量化增强像素风
 
 预览微调覆盖剩余的边缘情况：
 - AI 可能有 2-5px 的网格偏移
 - 帧之间可能有细边框
+- 角色可能不在画布正中央
 
 这比反复重试更省 token 和时间。
 
-### 不需要"切割"
+### 不需要"切割"——保持原始分辨率
 
-PixelPal 的渲染系统原生支持 spritesheet：
-- `SpriteRenderer.ts` 的 `drawFrame` 通过 `frameIndex % framesPerRow` 和 `Math.floor(frameIndex / framesPerRow)` 定位帧
-- 后处理确保图像精确匹配目标尺寸后，整张 spritesheet 直接保存
-- 配置正确的 `frameCount` 和 `framesPerRow` 即可正确渲染
+- AI 图像模型（DALL-E / gpt-image-1）只能输出 1024x1024 等大尺寸，不能直接生成 32x32 小图
+- 强行缩放到小尺寸会丢失细节
+- **方案**：保持 AI 生成的 1024x1024 原始分辨率，`SpriteRenderer` 在渲染时按 `displayScale` 缩放
+- `imageSmoothingEnabled = false` 确保缩放时保持硬边缘像素感
+- 用户通过 `displayScale`（1-10）自由控制显示大小
 
 ### 默认尺寸策略
 
-| 帧尺寸 | 总尺寸 | 说明 |
-|--------|--------|------|
-| 32x32 | 64x64 (2x2) | 默认，兼容现有 default-cat |
-| 32x32 | 128x64 (4x2) | 4 帧长动画 |
-| 64x64 | 128x128 (2x2) | 高分辨率 |
+| AI 输出 | 保存分辨率 | 每帧估算 | 说明 |
+|---------|-----------|----------|------|
+| 1024x1024 | 保持 1024x1024 | ~256x256 (2x2) | 2x2 网格时每帧约 512x512 |
+| 1024x1024 | 保持 1024x1024 | ~256x256 (4x2) | 4x2 网格时每帧约 256x512 |
 
-AI 生成统一请求 `1024x1024`，由 `SpriteRenderer` 按比例缩放渲染（`imageSmoothingEnabled = false` 保持像素感）。
+> 实际每帧大小由用户裁剪后的 `crop_w / frames_per_row` 决定。PixelPal 的 `displayScale` 负责最终渲染大小。
 
 ### Prompt 模板
 
@@ -374,33 +378,32 @@ AI 生成统一请求 `1024x1024`，由 `SpriteRenderer` 按比例缩放渲染�
 
 ```
 A pixel-art character standing front-facing: {user_description}.
-Transparent background. {frame_size}x{frame_size} pixels.
-Centered, full body visible. Clean crisp pixel edges. Game-asset style.
+Transparent background. Centered, full body visible.
+Clean crisp pixel edges. Pixel-art game-asset style.
 ```
 
 示例：
 ```
 A pixel-art character standing front-facing: a cute orange cat with white belly, blue eyes, small pink nose, short tail.
-Transparent background. 32x32 pixels.
-Centered, full body visible. Clean crisp pixel edges. Game-asset style.
+Transparent background. Centered, full body visible.
+Clean crisp pixel edges. Pixel-art game-asset style.
 ```
 
 #### Step 2 — Spritesheet
 
 ```
 Sprite sheet of EXACTLY the same character: {base_description}.
-{animation_name} animation, {frame_count} frames arranged in {rows}x{cols} grid,
-{frame_size}x{frame_size} per frame.
+{animation_name} animation, {frame_count} frames arranged in a {rows}x{cols} grid.
 CRITICAL: Same colors, proportions, art style in ALL frames.
-Transparent background. Clean crisp pixel edges. Game-asset style.
+Transparent background. Clean crisp pixel edges. Pixel-art game-asset style.
 ```
 
 示例（idle 动画）：
 ```
 Sprite sheet of EXACTLY the same character: a cute orange cat with white belly, blue eyes, small pink nose, short tail.
-Idle animation, 4 frames arranged in 2x2 grid, 32x32 per frame.
+Idle animation, 4 frames arranged in a 2x2 grid.
 CRITICAL: Same colors, proportions, art style in ALL frames.
-Transparent background. Clean crisp pixel edges. Game-asset style.
+Transparent background. Clean crisp pixel edges. Pixel-art game-asset style.
 ```
 
 ## 安全与隐私
@@ -442,7 +445,6 @@ ai.baseDescription: 'Character Description'
 ai.animationDescription: 'Animation Description'
 ai.frameCount: 'Frames'
 ai.framesPerRow: 'Per Row'
-ai.frameSize: 'Frame Size'
 ai.step1: 'Step 1 — Character'
 ai.step2: 'Step 2 — Animation'
 ai.basePreview: 'Character Preview'
@@ -462,7 +464,7 @@ ai.proceedToStep2: 'Continue to Animation'
 - `generate_base`：mock HTTP 响应测试成功/错误路径
 - `generate_spritesheet`：mock HTTP 响应测试成功/错误路径
 - `save_ai_sprite`：裁剪参数边界测试
-- 后处理流水线：透明化、缩放、颜色量化
+- 后处理流水线：透明化、颜色量化
 
 ### TypeScript
 - `generate_base` / `generate_spritesheet` 命令前端调用封装
