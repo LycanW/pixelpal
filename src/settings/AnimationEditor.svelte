@@ -4,6 +4,7 @@
   import { emit } from '@tauri-apps/api/event';
   import { t } from '../lib/i18n.svelte';
   import type { AnimationDef } from '../lib/pet/types';
+  import AiGenerationModal from './AiGenerationModal.svelte';
 
   let { petId, onDirtyChange }: { petId: string; onDirtyChange?: (dirty: boolean) => void } = $props();
 
@@ -15,6 +16,8 @@
   let newName = $state('');
   let imageFiles = $state<string[]>([]);
   let renames = $state<Record<string, string>>({});
+  let showAiModal = $state(false);
+  let aiAnimationName = $state('');
 
   function markDirty() { dirty = true; onDirtyChange?.(true); }
   function clearDirty() { dirty = false; onDirtyChange?.(false); }
@@ -164,6 +167,11 @@
     }
   }
 
+  function openAiModal(name: string) {
+    aiAnimationName = name;
+    showAiModal = true;
+  }
+
   async function remove(name: string) {
     if (!window.confirm(`Delete animation "${name}"?`)) return;
     const source = animations[name]?.source;
@@ -227,6 +235,7 @@
             <input class="fpr" type="number" min={1} value={anim.source.toLowerCase().endsWith('.gif') ? '' : (anim.framesPerRow ?? '')} disabled={anim.source.toLowerCase().endsWith('.gif')} onblur={(e) => { const v = (e.target as HTMLInputElement).value; anim.framesPerRow = v ? Math.max(1, parseInt(v)) : undefined; markDirty(); }} onkeydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} placeholder={anim.source.toLowerCase().endsWith('.gif') ? '—' : '2'} />
             <label class="lp"><input type="checkbox" checked={anim.loop} onchange={(e) => { anim.loop = (e.target as HTMLInputElement).checked; markDirty(); }} /></label>
             <input class="du" type="number" min={0} value={anim.duration ?? ''} onblur={(e) => { const v = (e.target as HTMLInputElement).value; anim.duration = v ? Math.max(0, parseInt(v)) : undefined; markDirty(); }} onkeydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} placeholder="—" />
+            <button class="ai-btn" onclick={() => openAiModal(name)} title="AI Generate">🎨</button>
             <button class="del-btn" onclick={() => remove(name)} title="Remove">✕</button>
           </div>
         {/each}
@@ -269,6 +278,15 @@
   </section>
 </div>
 
+{#if showAiModal}
+  <AiGenerationModal
+    petId={petId}
+    animationName={aiAnimationName}
+    onClose={() => { showAiModal = false; }}
+    onSaved={() => { load(); loadImages(); }}
+  />
+{/if}
+
 <style>
   .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
   h2 { font-size: 15px; margin: 0; color: var(--text-primary); }
@@ -290,6 +308,7 @@
   .lp { text-align: center; }
   .lp input { width: auto; }
   .del-btn { background: none; border: none; cursor: pointer; color: var(--danger); font-size: 14px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ai-btn { background: none; border: none; cursor: pointer; font-size: 14px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
   .inline-add { display: flex; gap: 6px; align-items: center; }
   .inline-add input { padding: 4px 8px; border: 1px solid var(--border-input); border-radius: var(--radius-sm); font-size: 12px; background: var(--bg-secondary); color: var(--text-primary); }
   .assets { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
