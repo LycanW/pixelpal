@@ -2,7 +2,9 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use base64::Engine;
+use image::ImageEncoder;
 use crate::commands::{AppState, save_settings};
+use crate::ai_image;
 use crate::ai_prompts;
 
 #[derive(Debug, Serialize)]
@@ -89,6 +91,41 @@ async fn call_image_generation(
   base64::engine::general_purpose::STANDARD
     .decode(b64)
     .map_err(|e| format!("decode base64: {}", e))
+}
+
+#[tauri::command]
+pub async fn generate_base(
+  state: State<'_, AppState>,
+  description: String,
+) -> Result<String, String> {
+  let (base_url, api_key) = {
+    let settings = state.settings.lock().unwrap_or_else(|e: std::sync::PoisonError<std::sync::MutexGuard<'_, crate::commands::AppSettings>>| e.into_inner());
+    let base_url = settings.ai_base_url.clone()
+      .ok_or("AI base URL not configured")?;
+    let api_key = settings.ai_api_key.clone()
+      .ok_or("AI API key not configured")?;
+    (base_url, api_key)
+  };
+
+  let prompt = ai_prompts::build_base_prompt(&description);
+  let bytes = call_image_generation(&base_url, &api_key, &prompt).await?;
+
+  let mut img = image::load_from_memory(&bytes)
+    .map_err(|e| format!("load image: {}", e))?
+    .to_rgba8();
+
+  ai_image::make_background_transparent(&mut img, 30);
+  let cropped = ai_image::auto_crop_to_content(&img);
+
+  let mut buf = Vec::new();
+  image::codecs::png::PngEncoder::new(&mut buf)
+    .write_image(
+      &cropped, cropped.width(), cropped.height(), image::ColorType::Rgba8.into()
+    )
+    .map_err(|e| format!("encode png: {}", e))?;
+
+  let b64 = base64::engine::general_purpose::STANDARD.encode(&buf);
+  Ok(format!("data:image/png;base64,{}", b64))
 }
 
 #[cfg(test)]

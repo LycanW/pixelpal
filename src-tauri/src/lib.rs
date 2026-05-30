@@ -137,6 +137,7 @@ pub fn run() {
       commands::get_platform_info,
       ai_commands::get_ai_config,
       ai_commands::set_ai_config,
+      ai_commands::generate_base,
     ])
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_autostart::init(
