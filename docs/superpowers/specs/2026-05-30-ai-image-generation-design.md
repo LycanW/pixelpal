@@ -16,32 +16,39 @@
 ```
 用户描述角色
     │
+    ├─→ Step 1: 生成 Base 角色
+    │    [generate_base(description, frame_size)]
+    │    │
+    │    ▼
+    │  HTTP POST /v1/images/generations
+    │    │
+    │    ▼
+    │  返回 32x32 base 帧 PNG
+    │    │
+    │    ▼
+    │  用户预览 base 帧 → 满意？继续 / 不满意？重试
+    │    │
+    │    ▼
+    │  Rust 提取角色特征描述（颜色、外形）
+    │    │
+    ├─→ Step 2: 生成完整 Spritesheet
+    │    [generate_spritesheet(base_desc, frame_count, frames_per_row, frame_size)]
+    │    │
+    │    ▼
+    │  HTTP POST /v1/images/generations（prompt 锁定 base 描述）
+    │    │
+    │    ▼
+    │  返回完整 spritesheet PNG
+    │    │
+    │    ▼
+    │  Rust 后端图像后处理（缩放、透明化）
+    │    │
+    │    ▼
     ▼
-前端弹窗（prompt + frameCount + framesPerRow + frameSize）
+前端预览弹窗（裁剪区域 + 帧预览）
     │
     ▼
-Rust 命令 generate_sprite(prompt, frame_count, frames_per_row, frame_size)
-    │
-    ▼
-HTTP POST {base_url}/v1/images/generations
-    │
-    ▼
-AI 返回图片 URL / base64
-    │
-    ▼
-Rust 下载图片
-    │
-    ▼
-后端图像后处理（缩放、透明化、网格对齐）
-    │
-    ▼
-返回 base64 PNG data URL
-    │
-    ▼
-前端预览弹窗（可微调裁剪区域、网格偏移）
-    │
-    ▼
-用户确认后保存为 PNG 到宠物目录
+用户确认 → [save_ai_sprite(...)] → 保存 PNG
     │
     ▼
 自动创建/更新动画定义（frameCount, framesPerRow, source）
@@ -71,26 +78,50 @@ pub struct AppSettings {
 |------|------|--------|------|
 | `get_ai_config` | — | `{ base_url: String, has_key: bool }` | 不返回 key 本身 |
 | `set_ai_config` | `{ base_url: String, api_key: String }` | `Result<(), String>` | 验证 URL 格式 |
-| `generate_sprite` | `{ prompt: String, frame_count: u32, frames_per_row: u32, frame_size: u32 }` | `Result<String, String>` | 返回后处理后的 base64 PNG data URL |
+| `generate_base` | `{ description: String, frame_size: u32 }` | `Result<String, String>` | Step 1：生成角色 base 帧，返回 base64 PNG |
+| `generate_spritesheet` | `{ base_description: String, animation_name: String, frame_count: u32, frames_per_row: u32, frame_size: u32 }` | `Result<String, String>` | Step 2：以 base 描述为锚点生成 spritesheet，返回后处理后的 base64 PNG |
 | `save_ai_sprite` | `{ pet_id: String, filename: String, base64: String, crop_x: u32, crop_y: u32, crop_w: u32, crop_h: u32 }` | `Result<(), String>` | 按裁剪参数截取并保存 PNG 到宠物目录 |
 
-#### `generate_sprite` 实现细节
+#### Step 1: `generate_base` 实现细节
 
 1. **构建请求体**（OpenAI images/generations 格式）：
    ```json
    {
      "model": "gpt-image-1",
-     "prompt": "A cute pixel-art {description}, arranged in a {rows}x{cols} sprite sheet grid, transparent background, crisp pixel edges, {frame_size}x{frame_size} pixels per frame",
+     "prompt": "A pixel-art character standing front-facing: {description}. Transparent background. {frame_size}x{frame_size} pixels. Centered, full body visible. Clean crisp pixel edges.",
      "size": "1024x1024",
      "quality": "high",
      "n": 1
    }
    ```
-   
-2. **发送 HTTP 请求**（使用 `reqwest` crate），超时 60 秒
-3. **解析响应**：提取 `data[0].b64_json` 或 `data[0].url`
+
+2. **发送 HTTP 请求**，超时 60 秒
+3. **解析响应**：提取 `data[0].b64_json`
+4. **后处理**：缩放到 `frame_size × frame_size`，透明化
+5. **返回 base64 data URL**
+
+**base 帧的作用**：
+- 让用户先看到角色长什么样，满意再继续
+- 提取角色特征描述（颜色、外形），作为 Step 2 的锚点
+- 防止"生成完发现角色完全不对"的浪费
+
+#### Step 2: `generate_spritesheet` 实现细节
+
+1. **构建请求体**（base 描述锁定一致性）：
+   ```json
+   {
+     "model": "gpt-image-1",
+     "prompt": "Sprite sheet of EXACTLY the same character: {base_description}. {animation_name} animation, {frame_count} frames arranged in {rows}x{cols} grid, {frame_size}x{frame_size} per frame. CRITICAL: Same colors, proportions, art style in ALL frames. Transparent background. Clean crisp pixel edges. Game-asset style.",
+     "size": "1024x1024",
+     "quality": "high",
+     "n": 1
+   }
+   ```
+
+2. **发送 HTTP 请求**，超时 60 秒
+3. **解析响应**：提取 `data[0].b64_json`
 4. **图像后处理**（见下方"后端图像后处理"章节）
-5. **返回 base64 data URL**（`data:image/png;base64,...`）
+5. **返回 base64 data URL**
 
 ### 依赖变更
 
@@ -126,17 +157,29 @@ Model:    gpt-image-1 (固定，提示文字说明)
 ```
 [空白宠物] [AI 生成]
 
-AI 生成模式：
+Step 1 — 生成角色：
 描述: [一只橙色的像素小猫，会眨眼]
-帧数: [4]      每行: [2]      (自动生成 2x2 spritesheet)
+帧尺寸: [32] px
 
-[生成并创建]
+[生成角色预览]
+
+┌──────────┐
+│ [base图] │  ← 用户确认角色外观
+└──────────┘
+[角色OK，继续生成动画]
+
+Step 2 — 生成动画：
+帧数: [4]      每行: [2]
+[生成动画] → 弹出预览弹窗 → [确认并保存]
 ```
 
 流程：
-1. 用户输入描述，确认帧数和行列数
-2. 调用 `generate_sprite`
-3. 图片返回后：
+1. 用户输入描述，确认帧尺寸
+2. **Step 1** 调用 `generate_base`
+3. 显示 base 帧预览，用户确认角色外观
+4. **Step 2** 调用 `generate_spritesheet`
+5. 弹出预览弹窗，用户可微调裁剪
+6. 确认后：
    - 创建宠物目录（现有 `create_pet`）
    - 保存 PNG 为 `{petId}/idle.png`
    - 写入 `config.json`：
@@ -157,7 +200,7 @@ AI 生成模式：
        }
      }
      ```
-4. 自动激活新宠物，主窗口立刻显示
+7. 自动激活新宠物，主窗口立刻显示
 
 ### 3. AnimationEditor — 单动画 AI 生成
 
@@ -173,17 +216,25 @@ walk    walk.png    100    4    2    ☑    —    [🎨] [✕]
 
 ```
 为动画 "idle" 生成素材
-描述: [这只小猫 idle 状态的动画]
+
+Step 1 — 角色描述（已自动填入宠物名称）：
+[一只橙色的像素小猫]
+[重新生成角色] [使用当前角色]
+
+Step 2 — 动画参数：
+描述: [idle 状态，缓慢眨眼]
 帧数: [4]      每行: [2]
-[生成] [取消]
+[生成动画] → 弹出预览弹窗 → [确认并保存]
 ```
 
 流程：
-1. 用户确认/修改描述
-2. 调用 `generate_sprite`
-3. 图片返回后保存为 PNG（若已有同名文件则覆盖）
-4. 自动更新当前动画的 `frameCount` / `framesPerRow`
-5. 触发 `pet-changed` 事件，主窗口和预览即时更新
+1. 用户确认/修改角色描述（首次生成时需先走 Step 1）
+2. 若宠物已有 base 描述缓存，可直接使用（跳过 Step 1）
+3. **Step 1** 调用 `generate_base`（首次或用户要求重生成时）
+4. **Step 2** 调用 `generate_spritesheet`
+5. 弹出预览弹窗，用户确认后保存
+6. 自动更新当前动画的 `frameCount` / `framesPerRow`
+7. 触发 `pet-changed` 事件，主窗口和预览即时更新
 
 ## 后端图像后处理
 
@@ -275,14 +326,30 @@ Rust 后端后处理后，前端默认裁剪参数为：
 
 ## 关键设计决策
 
+### 为什么是两步生成而非单次生成
+
+**单次生成的痛点**：
+- AI 对"spritesheet 网格布局"的遵守率约 60-70%
+- 帧之间角色颜色、体型漂移严重
+- 用户需要反复重试（抽奖），实际成本更高
+
+**两步生成的优势**：
+- Step 1 让用户先确认角色外观，不满意重试成本低（单帧）
+- Step 2 用 base 描述锁定角色特征，帧间一致性从 ~60% 提升到 ~85%
+- 总 API 调用仅 2 次，远少于反复重试的 3-5 次
+
 ### 为什么是"后处理 + 预览"而非纯 prompt
 
-AI 图像生成对精确几何约束的遵守率约 70-80%：
-- 背景可能带轻微颜色而非完全透明
-- 网格可能有 2-5px 的偏移
+后处理解决几何问题：
+- 背景透明化（AI 常生成浅灰/白色背景而非透明）
+- 精确缩放到目标像素尺寸
+- 颜色量化增强像素风
+
+预览微调覆盖剩余的边缘情况：
+- AI 可能有 2-5px 的网格偏移
 - 帧之间可能有细边框
 
-后处理解决 80% 的问题，预览微调覆盖剩余的 20%。这比反复重试更省 token 和时间。
+这比反复重试更省 token 和时间。
 
 ### 不需要"切割"
 
@@ -303,17 +370,37 @@ AI 生成统一请求 `1024x1024`，由 `SpriteRenderer` 按比例缩放渲染�
 
 ### Prompt 模板
 
+#### Step 1 — Base 帧
+
 ```
-A pixel-art character sprite sheet for "{animation_name}" state: {user_description}.
-Arranged in a {rows}x{cols} grid of {frame_w}x{frame_h} pixel frames.
-Transparent background. Crisp clean pixel edges. Game-asset style.
+A pixel-art character standing front-facing: {user_description}.
+Transparent background. {frame_size}x{frame_size} pixels.
+Centered, full body visible. Clean crisp pixel edges. Game-asset style.
+```
+
+示例：
+```
+A pixel-art character standing front-facing: a cute orange cat with white belly, blue eyes, small pink nose, short tail.
+Transparent background. 32x32 pixels.
+Centered, full body visible. Clean crisp pixel edges. Game-asset style.
+```
+
+#### Step 2 — Spritesheet
+
+```
+Sprite sheet of EXACTLY the same character: {base_description}.
+{animation_name} animation, {frame_count} frames arranged in {rows}x{cols} grid,
+{frame_size}x{frame_size} per frame.
+CRITICAL: Same colors, proportions, art style in ALL frames.
+Transparent background. Clean crisp pixel edges. Game-asset style.
 ```
 
 示例（idle 动画）：
 ```
-A pixel-art character sprite sheet for "idle" state: a cute orange cat blinking slowly.
-Arranged in a 2x2 grid of 32x32 pixel frames.
-Transparent background. Crisp clean pixel edges. Game-asset style.
+Sprite sheet of EXACTLY the same character: a cute orange cat with white belly, blue eyes, small pink nose, short tail.
+Idle animation, 4 frames arranged in 2x2 grid, 32x32 per frame.
+CRITICAL: Same colors, proportions, art style in ALL frames.
+Transparent background. Clean crisp pixel edges. Game-asset style.
 ```
 
 ## 安全与隐私
@@ -346,13 +433,25 @@ ai.apiKey: 'API Key'
 ai.model: 'Model'
 ai.save: 'Save'
 ai.generate: 'Generate'
+ai.generateBase: 'Generate Character'
+ai.generateSpritesheet: 'Generate Animation'
+ai.regenerateBase: 'Regenerate Character'
+ai.useCurrentBase: 'Use Current Character'
 ai.description: 'Description'
+ai.baseDescription: 'Character Description'
+ai.animationDescription: 'Animation Description'
 ai.frameCount: 'Frames'
 ai.framesPerRow: 'Per Row'
+ai.frameSize: 'Frame Size'
+ai.step1: 'Step 1 — Character'
+ai.step2: 'Step 2 — Animation'
+ai.basePreview: 'Character Preview'
 ai.generating: 'Generating...'
 ai.success: 'Generated successfully'
 ai.emptyPrompt: 'Please enter a description'
 ai.noConfig: 'AI not configured. Please set Base URL and API Key in Display Settings.'
+ai.baseConfirm: 'Character looks good?'
+ai.proceedToStep2: 'Continue to Animation'
 ```
 
 ## 测试策略
@@ -360,20 +459,23 @@ ai.noConfig: 'AI not configured. Please set Base URL and API Key in Display Sett
 ### Rust
 - `set_ai_config`：URL 格式验证（合法/非法）
 - `get_ai_config`：不返回 key 明文
-- `generate_sprite`：mock HTTP 响应测试成功/错误路径
+- `generate_base`：mock HTTP 响应测试成功/错误路径
+- `generate_spritesheet`：mock HTTP 响应测试成功/错误路径
+- `save_ai_sprite`：裁剪参数边界测试
+- 后处理流水线：透明化、缩放、颜色量化
 
 ### TypeScript
-- `generate_sprite` 命令前端调用封装
+- `generate_base` / `generate_spritesheet` 命令前端调用封装
 - 配置面板的读写状态同步
-- 生成弹窗的表单验证
+- 两步生成弹窗的状态流转（Step 1 → Step 2 → 预览）
 
 ## 实现阶段
 
 | 阶段 | 内容 |
 |------|------|
-| 1 | Rust：`reqwest` + `image` 依赖 + AI 配置存储 + `generate_sprite` 命令 + 图像后处理 |
+| 1 | Rust：`reqwest` + `image` 依赖 + AI 配置存储 + `generate_base` / `generate_spritesheet` 命令 + 图像后处理 |
 | 2 | 前端：DisplaySettings 新增 AI 配置区域 |
-| 3 | 前端：AI 预览弹窗组件（裁剪 + 帧预览） |
+| 3 | 前端：两步 AI 生成弹窗组件（Step 1 base 预览 + Step 2 spritesheet 预览 + 裁剪微调） |
 | 4 | 前端：AnimationEditor 新增 🎨 AI 生成按钮 |
 | 5 | 前端：HomeView 创建弹窗新增 AI 生成选项卡 |
 | 6 | 端到端测试 + 文档更新 |
