@@ -1,7 +1,9 @@
 use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tauri::State;
+use base64::Engine;
 use crate::commands::{AppState, save_settings};
+use crate::ai_prompts;
 
 #[derive(Debug, Serialize)]
 pub struct AiConfig {
@@ -35,6 +37,58 @@ pub fn set_ai_config(state: State<AppState>, payload: SetAiConfigPayload) -> Res
   settings.ai_api_key = Some(payload.api_key);
   save_settings(&settings);
   Ok(())
+}
+
+async fn call_image_generation(
+  base_url: &str,
+  api_key: &str,
+  prompt: &str,
+) -> Result<Vec<u8>, String> {
+  let client = reqwest::Client::builder()
+    .timeout(Duration::from_secs(60))
+    .build()
+    .map_err(|e| format!("build client: {}", e))?;
+
+  let url = format!("{}/images/generations", base_url.trim_end_matches('/'));
+
+  let body = serde_json::json!({
+    "model": "gpt-image-1",
+    "prompt": prompt,
+    "size": "1024x1024",
+    "quality": "high",
+    "n": 1,
+  });
+
+  let response = client
+    .post(&url)
+    .header("Authorization", format!("Bearer {}", api_key))
+    .json(&body)
+    .send()
+    .await
+    .map_err(|e| format!("request failed: {}", e))?;
+
+  if !response.status().is_success() {
+    let status = response.status();
+    let text = response.text().await.unwrap_or_default();
+    return Err(format!("API error {}: {}", status, text));
+  }
+
+  let json: serde_json::Value = response
+    .json()
+    .await
+    .map_err(|e| format!("parse response: {}", e))?;
+
+  let b64 = json
+    .get("data")
+    .and_then(|d| d.as_array())
+    .and_then(|arr| arr.first())
+    .and_then(|item| item.get("b64_json"))
+    .and_then(|b| b.as_str())
+    .ok_or_else(|| "missing b64_json in response".to_string())?;
+
+  base64::engine::general_purpose::STANDARD
+    .decode(b64)
+    .map_err(|e| format!("decode base64: {}", e))
 }
 
 #[cfg(test)]
