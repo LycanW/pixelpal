@@ -45,7 +45,7 @@ export class AnimationController {
     while (iterations < 100) {
       const frameTime = Math.max(1, delays
         ? (def.frameTime > 0 ? def.frameTime : delays[this.frameIndex] ?? 100)
-        : def.frameTime);
+        : (def.frameTime || 100));
       if (this.timer < frameTime) break;
       this.timer -= frameTime;
       iterations++;

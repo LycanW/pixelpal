@@ -37,6 +37,7 @@
   let ready = $state(false);
   let isWayland = false;
   let resizeObserver: ResizeObserver | null = null;
+  let loadVersion = 0;
 
   let canvasStyle = $derived(
     isWayland
@@ -46,7 +47,8 @@
 
   $effect(() => {
     if (ready && petId) {
-      loadPet(petId).then(() => applyConfig());
+      const version = ++loadVersion;
+      loadPet(petId, version).then((ok) => { if (ok) applyConfig(); });
     }
   });
 
@@ -61,12 +63,12 @@
     lastAction = '';
   }
 
-  async function loadPet(id: string) {
+  async function loadPet(id: string, version: number): Promise<boolean> {
     sprites.clear();
     try {
       const raw = await invoke<string>('read_json', { id, filename: 'config.json' });
-      config = JSON.parse(raw);
-      for (const [name, def] of Object.entries(config.animations)) {
+      const cfg: PetConfig = JSON.parse(raw);
+      for (const [name, def] of Object.entries(cfg.animations)) {
         try {
           if (def.source.toLowerCase().endsWith('.gif')) {
             const gifData = await loadGifAnimation(id, def.source);
@@ -80,9 +82,14 @@
           console.warn(`failed to load sprite for animation "${name}":`, e);
         }
       }
+      if (version !== loadVersion) return false;
+      config = cfg;
+      return true;
     } catch (e) {
       console.error('loadPet:', e);
+      if (version !== loadVersion) return false;
       config = { animations: {}, defaultState: 'idle', states: {} };
+      return true;
     }
   }
 
@@ -95,8 +102,9 @@
     const { listen } = await import('@tauri-apps/api/event');
     unlistenPetChanged = await listen('pet-changed', async (e) => {
       if (typeof e.payload === 'string') {
-        await loadPet(e.payload);
-        applyConfig();
+        const version = ++loadVersion;
+        const ok = await loadPet(e.payload, version);
+        if (ok) applyConfig();
       }
     });
 
