@@ -90,3 +90,54 @@ pub fn compose_spritesheet(frames: &[DynamicImage], frames_per_row: u32) -> Resu
 
   Ok(canvas)
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use image::RgbaImage;
+
+  #[test]
+  fn test_auto_crop_skips_transparent_edges() {
+    let mut img = RgbaImage::new(10, 10);
+    // Paint a 4x4 red square in the center
+    for y in 3..7 {
+      for x in 3..7 {
+        img.put_pixel(x, y, image::Rgba([255, 0, 0, 255]));
+      }
+    }
+    let cropped = auto_crop_to_content(&img);
+    assert_eq!(cropped.width(), 4);
+    assert_eq!(cropped.height(), 4);
+  }
+
+  #[test]
+  fn test_compose_spritesheet_2x2() {
+    let frames: Vec<DynamicImage> = (0..4)
+      .map(|i| {
+        let mut img = RgbaImage::new(32, 32);
+        let color = match i {
+          0 => image::Rgba([255, 0, 0, 255]),
+          1 => image::Rgba([0, 255, 0, 255]),
+          2 => image::Rgba([0, 0, 255, 255]),
+          _ => image::Rgba([255, 255, 0, 255]),
+        };
+        for y in 0..32 { for x in 0..32 { img.put_pixel(x, y, color); } }
+        DynamicImage::ImageRgba8(img)
+      })
+      .collect();
+
+    let sheet = compose_spritesheet(&frames, 2).unwrap();
+    assert_eq!(sheet.width(), 64);  // 2 * 32
+    assert_eq!(sheet.height(), 64); // 2 * 32
+    assert_eq!(sheet.get_pixel(0, 0), &image::Rgba([255, 0, 0, 255]));
+    assert_eq!(sheet.get_pixel(32, 0), &image::Rgba([0, 255, 0, 255]));
+    assert_eq!(sheet.get_pixel(0, 32), &image::Rgba([0, 0, 255, 255]));
+    assert_eq!(sheet.get_pixel(32, 32), &image::Rgba([255, 255, 0, 255]));
+  }
+
+  #[test]
+  fn test_compose_spritesheet_empty_fails() {
+    let frames: Vec<DynamicImage> = vec![];
+    assert!(compose_spritesheet(&frames, 2).is_err());
+  }
+}
