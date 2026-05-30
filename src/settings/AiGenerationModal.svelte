@@ -126,7 +126,7 @@
 </script>
 
 <div class="modal-overlay" onclick={onClose} role="presentation">
-  <div class="modal" onclick={(e: MouseEvent) => e.stopPropagation()} role="dialog">
+  <div class="modal" onclick={(e: MouseEvent) => e.stopPropagation()} onkeydown={(e: KeyboardEvent) => e.stopPropagation()} role="dialog" tabindex="-1">
     {#if step === 1}
       <h3>{t('ai.step1')} — {animationName}</h3>
       <label>{t('ai.description')}
