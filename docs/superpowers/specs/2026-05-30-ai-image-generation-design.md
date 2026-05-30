@@ -83,7 +83,7 @@ pub struct AppSettings {
 | `set_ai_config` | `{ base_url: String, api_key: String }` | `Result<(), String>` | 验证 URL 格式 |
 | `generate_base` | `{ description: String }` | `Result<String, String>` | Step 1：生成角色 base 图（1024x1024），返回 base64 PNG |
 | `generate_spritesheet` | `{ base_description: String, animation_name: String, frame_count: u32, frames_per_row: u32 }` | `Result<String, String>` | Step 2：以 base 描述为锚点生成 spritesheet（1024x1024），返回后处理后的 base64 PNG |
-| `save_ai_sprite` | `{ pet_id: String, filename: String, base64: String, crop_x: u32, crop_y: u32, crop_w: u32, crop_h: u32 }` | `Result<(), String>` | 按裁剪参数截取并保存 PNG 到宠物目录 |
+| `save_ai_sprite` | `{ pet_id: String, filename: String, base64: String, crop_x: u32, crop_y: u32, crop_w: u32, crop_h: u32, offset_x: i32, offset_y: i32, scale: f32 }` | `Result<(), String>` | 按裁剪+偏移+缩放参数截取并保存 PNG 到宠物目录 |
 
 #### Step 1: `generate_base` 实现细节
 
@@ -320,13 +320,89 @@ AI 生成后**不直接保存**，而是弹出预览弹窗让用户确认：
   - Rust 后端按裁剪参数截取图像、保存为 PNG
   - 前端更新 `config.json` 动画定义
 
-### 裁剪参数
+### 网格约束与预览微调
 
-用户通过预览弹窗自由调整裁剪区域：
-- `crop_x`, `crop_y` — 起始位置
-- `crop_w`, `crop_h` — 裁剪宽高
+这是 AI 生成的核心难点：AI 不会严格按像素坐标画出精确的网格线。我们的策略是**可视化约束**，而非后端强行切割。
 
-> 不再受 `frame_size` 硬约束。用户看到什么裁剪什么，`frameCount` 和 `framesPerRow` 决定渲染时如何切分这张裁剪后的图。
+#### 约束策略：不依赖 AI 画精确网格
+
+| 要求 | AI 遵守率 | 我们的处理 |
+|------|----------|-----------|
+| 画精确的网格线/分隔线 | ~30% | ❌ 不要求 |
+| 4 个姿势大致均匀分布 | ~85% | ✅ 只要求这个 |
+| 角色大小一致 | ~70% | ✅ 前端微调解决 |
+
+#### 前端预览的约束机制
+
+预览弹窗提供**可视化网格对齐工具**：
+
+```
+┌─────────────────────────────────────────┐
+│  预览 AI 生成结果 — 调整网格对齐          │
+│                                         │
+│  ┌─────────────────┐                    │
+│  │  ┌───┬───┐      │  网格偏移          │
+│  │  │ 0 │ 1 │      │  X: [0    ] px     │
+│  │  ├───┼───┤      │  Y: [0    ] px     │
+│  │  │ 2 │ 3 │      │                    │
+│  │  └───┴───┘      │  单帧缩放          │
+│  │   [预览图]       │  [%100  ]           │
+│  └─────────────────┘                    │
+│                                         │
+│  帧数: [4]    每行: [2]                 │
+│                                         │
+│  实时帧预览:                            │
+│  ┌────┬────┐                           │
+│  │ 0  │ 1  │                           │
+│  ├────┼────┤                           │
+│  │ 2  │ 3  │                           │
+│  └────┴────┘                           │
+│                                         │
+│  [重新生成]    [取消]    [确认并保存]     │
+└─────────────────────────────────────────┘
+```
+
+**可调参数**：
+- **网格偏移 X/Y** — 整体网格向左/右/上/下移动（应对 AI 画的角色偏左/偏右）
+- **单帧缩放** — 每帧显示大小缩放（应对 AI 画的角色过大/过小）
+- **帧数/每行** — 调整网格行列数
+
+**实时反馈**：
+- 左侧大图：原图 + 半透明网格线叠加
+- 下方小图：按当前参数切割后的每帧独立预览
+- 用户肉眼判断对齐是否满意
+
+**工作原理**：
+1. 根据 `crop_w / frames_per_row` 和 `crop_h / rows` 计算每帧的理论尺寸
+2. 从 `(crop_x + offset_x, crop_y + offset_y)` 开始，按理论尺寸均匀切割
+3. 每帧按 `scale` 参数缩放后显示在预览区
+4. 最终保存时：原图 + 裁剪参数 + 偏移参数 + 缩放参数一并交给 Rust
+
+#### 为什么这样更可靠
+
+- **AI 只需"大致均匀"**：不要求精确像素对齐，降低生成失败率
+- **人眼是最好的判断器**：用户看一眼就知道帧有没有对齐
+- **微调成本低**：拖一两个滑块，比反复重试 API 快得多
+- **保留原始素材**：原图 1024×1024 完整保存，微调参数作为元数据
+
+#### save_ai_sprite 参数更新
+
+```rust
+save_ai_sprite(
+    pet_id: String,
+    filename: String,
+    base64: String,
+    crop_x: u32,
+    crop_y: u32,
+    crop_w: u32,
+    crop_h: u32,
+    offset_x: i32,    // 网格水平偏移（可为负）
+    offset_y: i32,    // 网格垂直偏移（可为负）
+    scale: f32,       // 单帧缩放比例（0.5 ~ 2.0）
+)
+```
+
+Rust 后端按这些参数从原图中提取每帧，缩放后保存为最终 PNG。前端只保存原图和参数，不预处理。
 
 ## 关键设计决策
 
