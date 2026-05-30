@@ -6,6 +6,9 @@ use tauri::{
 use tauri_plugin_autostart::ManagerExt;
 
 mod commands;
+mod ai_commands;
+mod ai_image;
+mod ai_prompts;
 
 fn build_menu(app: &tauri::AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::Error>> {
   let state = app.state::<commands::AppState>();
@@ -132,6 +135,8 @@ pub fn run() {
       commands::get_autostart,
       commands::set_autostart,
       commands::get_platform_info,
+      ai_commands::get_ai_config,
+      ai_commands::set_ai_config,
     ])
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_autostart::init(
