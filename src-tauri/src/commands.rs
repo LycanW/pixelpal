@@ -109,7 +109,7 @@ pub fn list_pets(state: State<AppState>) -> Vec<String> {
   scan_pets(&dir)
 }
 
-fn sanitize_pet_id(id: &str) -> Result<(), String> {
+pub fn sanitize_pet_id(id: &str) -> Result<(), String> {
   if id.is_empty() || id.contains("..") || id.contains('/') || id.contains('\\') {
     return Err("invalid pet id".into());
   }

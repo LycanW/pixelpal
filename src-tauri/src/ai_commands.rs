@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 use base64::Engine;
 use image::ImageEncoder;
-use crate::commands::{AppState, save_settings};
+use crate::commands::{AppState, resolve_pets_dir, sanitize_pet_id, save_settings};
 use crate::ai_image;
 use crate::ai_prompts;
 
@@ -177,6 +177,55 @@ pub async fn generate_frame(
 
   let b64 = base64::engine::general_purpose::STANDARD.encode(&buf);
   Ok(format!("data:image/png;base64,{}", b64))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SaveAiSpritePayload {
+  pet_id: String,
+  filename: String,
+  frames: Vec<String>, // base64 data URLs
+  frames_per_row: u32,
+}
+
+#[tauri::command]
+pub fn save_ai_sprite(
+  state: State<AppState>,
+  payload: SaveAiSpritePayload,
+) -> Result<(), String> {
+  sanitize_pet_id(&payload.pet_id)?;
+
+  let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
+  let pets_dir = resolve_pets_dir(&settings);
+  drop(settings);
+
+  let pet_dir = pets_dir.join(&payload.pet_id);
+  std::fs::create_dir_all(&pet_dir)
+    .map_err(|e| format!("create dir: {}", e))?;
+
+  let mut decoded_frames = Vec::new();
+  for (idx, b64_data) in payload.frames.iter().enumerate() {
+    let b64 = b64_data
+      .strip_prefix("data:image/png;base64,")
+      .unwrap_or(b64_data);
+    let bytes = base64::engine::general_purpose::STANDARD
+      .decode(b64)
+      .map_err(|e| format!("decode frame {}: {}", idx, e))?;
+    let img = image::load_from_memory(&bytes)
+      .map_err(|e| format!("load frame {}: {}", idx, e))?;
+    decoded_frames.push(img);
+  }
+
+  let spritesheet = ai_image::compose_spritesheet(
+    &decoded_frames, payload.frames_per_row
+  ).map_err(|e| format!("compose: {}", e))?;
+
+  let dest = pet_dir.join(&payload.filename);
+  spritesheet
+    .save_with_format(&dest, image::ImageFormat::Png
+    )
+    .map_err(|e| format!("save spritesheet: {}", e))?;
+
+  Ok(())
 }
 
 #[cfg(test)]
