@@ -128,6 +128,57 @@ pub async fn generate_base(
   Ok(format!("data:image/png;base64,{}", b64))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct GenerateFramePayload {
+  base_description: String,
+  animation_name: String,
+  frame_index: u32,
+  total_frames: u32,
+  pose_description: String,
+}
+
+#[tauri::command]
+pub async fn generate_frame(
+  state: State<'_, AppState>,
+  payload: GenerateFramePayload,
+) -> Result<String, String> {
+  let (base_url, api_key) = {
+    let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
+    let base_url = settings.ai_base_url.clone()
+      .ok_or("AI base URL not configured")?;
+    let api_key = settings.ai_api_key.clone()
+      .ok_or("AI API key not configured")?;
+    (base_url, api_key)
+  };
+
+  let prompt = ai_prompts::build_frame_prompt(
+    &payload.base_description,
+    &payload.animation_name,
+    payload.frame_index,
+    payload.total_frames,
+    &payload.pose_description,
+  );
+
+  let bytes = call_image_generation(&base_url, &api_key, &prompt).await?;
+
+  let mut img = image::load_from_memory(&bytes)
+    .map_err(|e| format!("load image: {}", e))?
+    .to_rgba8();
+
+  ai_image::make_background_transparent(&mut img, 30);
+  let cropped = ai_image::auto_crop_to_content(&img);
+
+  let mut buf = Vec::new();
+  image::codecs::png::PngEncoder::new(&mut buf)
+    .write_image(
+      &cropped, cropped.width(), cropped.height(), image::ColorType::Rgba8.into()
+    )
+    .map_err(|e| format!("encode png: {}", e))?;
+
+  let b64 = base64::engine::general_purpose::STANDARD.encode(&buf);
+  Ok(format!("data:image/png;base64,{}", b64))
+}
+
 #[cfg(test)]
 mod tests {
   #[test]

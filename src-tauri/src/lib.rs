@@ -138,6 +138,7 @@ pub fn run() {
       ai_commands::get_ai_config,
       ai_commands::set_ai_config,
       ai_commands::generate_base,
+      ai_commands::generate_frame,
     ])
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_autostart::init(
