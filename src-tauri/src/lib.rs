@@ -139,6 +139,7 @@ pub fn run() {
       ai_commands::set_ai_config,
       ai_commands::generate_base,
       ai_commands::generate_frame,
+      ai_commands::generate_row,
       ai_commands::save_ai_sprite,
     ])
     .plugin(tauri_plugin_dialog::init())

@@ -30,5 +30,5 @@ tauri-plugin-log = "2"
 tauri-plugin-autostart = "2"
 base64 = "0.22"
 dirs = "6"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
 image = { version = "0.25", default-features = false, features = ["png"] }

@@ -1,23 +1,140 @@
 use image::{DynamicImage, GenericImage, GenericImageView, RgbaImage};
 
+/// Color distance in RGB space.
+fn color_dist(r1: u8, g1: u8, b1: u8, r2: u8, g2: u8, b2: u8) -> u32 {
+  let dr = (r1 as i32 - r2 as i32).abs() as u32;
+  let dg = (g1 as i32 - g2 as i32).abs() as u32;
+  let db = (b1 as i32 - b2 as i32).abs() as u32;
+  dr * dr + dg * dg + db * db
+}
+
+/// Make background transparent using flood-fill from image edges.
+/// Only pixels connected to the edge AND matching the background color become transparent.
+/// Internal pixels (like white eye highlights) are preserved.
 pub fn make_background_transparent(img: &mut RgbaImage, threshold: u8) {
+  let (w, h) = (img.width(), img.height());
+  if w == 0 || h == 0 { return; }
+
+  let threshold_sq = (threshold as u32) * (threshold as u32);
+
+  // Sample background from four corners
   let corners = [
     img.get_pixel(0, 0),
-    img.get_pixel(img.width() - 1, 0),
-    img.get_pixel(0, img.height() - 1),
-    img.get_pixel(img.width() - 1, img.height() - 1),
+    img.get_pixel(w - 1, 0),
+    img.get_pixel(0, h - 1),
+    img.get_pixel(w - 1, h - 1),
   ];
-  let bg_r = corners.iter().map(|p| p[0] as u32).sum::<u32>() / 4;
-  let bg_g = corners.iter().map(|p| p[1] as u32).sum::<u32>() / 4;
-  let bg_b = corners.iter().map(|p| p[2] as u32).sum::<u32>() / 4;
+  let bg_r = (corners.iter().map(|p| p[0] as u32).sum::<u32>() / 4) as u8;
+  let bg_g = (corners.iter().map(|p| p[1] as u32).sum::<u32>() / 4) as u8;
+  let bg_b = (corners.iter().map(|p| p[2] as u32).sum::<u32>() / 4) as u8;
 
-  for pixel in img.pixels_mut() {
-    let dr = (pixel[0] as i32 - bg_r as i32).abs() as u32;
-    let dg = (pixel[1] as i32 - bg_g as i32).abs() as u32;
-    let db = (pixel[2] as i32 - bg_b as i32).abs() as u32;
-    let dist = ((dr * dr + dg * dg + db * db) as f64).sqrt() as u8;
-    if dist < threshold {
-      pixel[3] = 0;
+  let mut visited = vec![false; (w * h) as usize];
+  let mut queue = Vec::new();
+
+  // Seed from all edge pixels matching background color
+  let mut seed = |x: u32, y: u32| {
+    let idx = (y * w + x) as usize;
+    if visited[idx] { return; }
+    let p = img.get_pixel(x, y);
+    if color_dist(p[0], p[1], p[2], bg_r, bg_g, bg_b) <= threshold_sq {
+      visited[idx] = true;
+      queue.push((x, y));
+    }
+  };
+
+  for x in 0..w {
+    seed(x, 0);
+    seed(x, h - 1);
+  }
+  for y in 0..h {
+    seed(0, y);
+    seed(w - 1, y);
+  }
+
+  // BFS flood fill — only remove edge-connected background
+  let mut head = 0;
+  while head < queue.len() {
+    let (x, y) = queue[head];
+    head += 1;
+
+    img.get_pixel_mut(x, y)[3] = 0;
+
+    let neighbors = [
+      (x.wrapping_sub(1), y), (x + 1, y),
+      (x, y.wrapping_sub(1)), (x, y + 1),
+    ];
+    for (nx, ny) in neighbors {
+      if nx < w && ny < h {
+        let idx = (ny * w + nx) as usize;
+        if !visited[idx] {
+          let np = img.get_pixel(nx, ny);
+          if color_dist(np[0], np[1], np[2], bg_r, bg_g, bg_b) <= threshold_sq {
+            visited[idx] = true;
+            queue.push((nx, ny));
+          }
+        }
+      }
+    }
+  }
+
+  // ── Post-pass: remove small isolated non-transparent artifacts ──
+  // After flood fill, edge anti-aliasing may leave small colored fragments
+  // near the silhouette.  We keep only the largest connected opaque blob.
+  let mut label = vec![0u32; (w * h) as usize];
+  let mut current_label = 0u32;
+  let mut label_areas: Vec<u32> = Vec::new();
+
+  for y in 0..h {
+    for x in 0..w {
+      let idx = (y * w + x) as usize;
+      if img.get_pixel(x, y)[3] > 0 && label[idx] == 0 {
+        current_label += 1;
+        let mut area = 0u32;
+        let mut q = vec![(x, y)];
+        label[idx] = current_label;
+        let mut qi = 0usize;
+        while qi < q.len() {
+          let (cx, cy) = q[qi];
+          qi += 1;
+          area += 1;
+          let neighbors = [
+            (cx.wrapping_sub(1), cy), (cx + 1, cy),
+            (cx, cy.wrapping_sub(1)), (cx, cy + 1),
+          ];
+          for (nx, ny) in neighbors {
+            if nx < w && ny < h {
+              let nidx = (ny * w + nx) as usize;
+              if img.get_pixel(nx, ny)[3] > 0 && label[nidx] == 0 {
+                label[nidx] = current_label;
+                q.push((nx, ny));
+              }
+            }
+          }
+        }
+        label_areas.push(area);
+      }
+    }
+  }
+
+  if label_areas.is_empty() { return; }
+
+  // Find the largest opaque connected component (the character)
+  let mut max_area = 0u32;
+  let mut max_label = 0u32;
+  for (i, &area) in label_areas.iter().enumerate() {
+    if area > max_area {
+      max_area = area;
+      max_label = (i + 1) as u32;
+    }
+  }
+
+  // Remove everything except the largest component
+  for y in 0..h {
+    for x in 0..w {
+      let idx = (y * w + x) as usize;
+      if label[idx] != 0 && label[idx] != max_label {
+        img.get_pixel_mut(x, y)[3] = 0;
+      }
     }
   }
 }
@@ -62,6 +179,68 @@ pub fn quantize_colors(img: &mut RgbaImage, colors: usize) {
       pixel[i] = quantized;
     }
   }
+}
+
+/// Split a horizontal row image into N equal-width frames.
+pub fn split_row_into_frames(
+  row_img: &mut DynamicImage,
+  frame_count: u32,
+) -> Result<Vec<DynamicImage>, String> {
+  if frame_count == 0 {
+    return Err("frame_count must be > 0".into());
+  }
+  let (w, h) = (row_img.width(), row_img.height());
+  let slot_w = w / frame_count;
+  if slot_w == 0 {
+    return Err(format!("image width {} too small for {} frames", w, frame_count));
+  }
+  let mut frames = Vec::new();
+  for i in 0..frame_count {
+    let x = i * slot_w;
+    let cw = if i == frame_count - 1 { w - x } else { slot_w };
+    frames.push(row_img.crop(x, 0, cw, h));
+  }
+  Ok(frames)
+}
+
+/// Force an image into pixel-art style.
+/// Steps: 1) auto-crop to content, 2) downscale to small pixel grid with nearest-neighbor
+/// to get hard edges, 3) upscale back to target size, 4) optional color quantization.
+pub fn pixelate(
+  img: &DynamicImage,
+  target_pixels: u32,
+  quantize: Option<usize>,
+) -> RgbaImage {
+  let rgba = img.to_rgba8();
+  let cropped = auto_crop_to_content(&rgba);
+  let (cw, ch) = (cropped.width(), cropped.height());
+  if cw == 0 || ch == 0 {
+    return cropped;
+  }
+
+  // Determine downscale dimensions maintaining aspect ratio
+  let ratio = cw as f32 / ch as f32;
+  let (small_w, small_h) = if ratio >= 1.0 {
+    (target_pixels, ((target_pixels as f32) / ratio).round().max(1.0) as u32)
+  } else {
+    (((target_pixels as f32) * ratio).round().max(1.0) as u32, target_pixels)
+  };
+
+  // Downscale with nearest neighbor (hard pixel edges)
+  let small = DynamicImage::ImageRgba8(cropped)
+    .resize(small_w, small_h, image::imageops::Nearest);
+
+  // Upscale back with nearest neighbor (keep blocky pixels)
+  let big = small.resize(cw, ch, image::imageops::Nearest);
+
+  let mut result = big.to_rgba8();
+
+  // Optional color quantization
+  if let Some(colors) = quantize {
+    quantize_colors(&mut result, colors);
+  }
+
+  result
 }
 
 pub fn compose_spritesheet(frames: &[DynamicImage], frames_per_row: u32) -> Result<RgbaImage, String> {

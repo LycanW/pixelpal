@@ -14,6 +14,7 @@ pub struct AppSettings {
   pub autostart: Option<bool>,
   pub ai_base_url: Option<String>,
   pub ai_api_key: Option<String>,
+  pub ai_model: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -27,6 +28,7 @@ impl Default for AppSettings {
       autostart: Some(false),
       ai_base_url: None,
       ai_api_key: None,
+      ai_model: None,
     }
   }
 }
@@ -752,6 +754,7 @@ mod tests {
       autostart: Some(true),
       ai_base_url: None,
       ai_api_key: None,
+      ai_model: None,
     };
     let json = serde_json::to_string_pretty(&original).unwrap();
     let restored: AppSettings = serde_json::from_str(&json).unwrap();

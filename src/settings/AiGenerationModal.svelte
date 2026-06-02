@@ -18,13 +18,39 @@
   let description = $state('');
   let baseDescription = $state('');
   let baseImage = $state('');
+  let hasExistingBase = $state(false);
+  let checkingBase = $state(true);
   let frameCount = $state(4);
   let framesPerRow = $state(2);
   let frames: string[] = $state([]);
   let spritesheetImage = $state('');
   let generating = $state(false);
-  let currentFrame = $state(0);
   let error = $state<string | null>(null);
+
+  async function checkExistingBase() {
+    checkingBase = true;
+    try {
+      // Try to load existing base.png
+      const img = await invoke<string>('read_pet_sprite', { id: petId, filename: 'base.png' });
+      baseImage = img;
+      hasExistingBase = true;
+
+      // Try to read config for the pet name/description
+      try {
+        const raw = await invoke<string>('read_json', { id: petId, filename: 'config.json' });
+        const cfg = JSON.parse(raw);
+        const petName = cfg.name || petId;
+        baseDescription = petName;
+      } catch {
+        baseDescription = petId;
+      }
+    } catch {
+      // No existing base — fresh pet or first animation
+      hasExistingBase = false;
+    } finally {
+      checkingBase = false;
+    }
+  }
 
   async function generateBase() {
     error = null;
@@ -41,35 +67,31 @@
     }
   }
 
+  async function useExistingBase() {
+    step = 2;
+  }
+
   async function generateAnimation() {
     error = null;
     generating = true;
     frames = [];
-    currentFrame = 0;
 
     try {
       const poses = [
-        'standing neutral, eyes open',
-        'standing neutral, eyes half closed',
-        'standing neutral, eyes fully closed',
-        'standing neutral, eyes half closed again',
+        'standing neutral, eyes wide open, chest slightly expanded (breathing in)',
+        'standing neutral, eyelids lowering (mid-blink), neutral breathing',
+        'standing neutral, eyes fully closed (blink peak), chest slightly contracted (breathing out)',
+        'standing neutral, eyelids rising (recovering from blink), neutral breathing',
       ];
 
-      for (let i = 0; i < frameCount; i++) {
-        currentFrame = i + 1;
-        const pose = poses[i % poses.length];
-        const frame = await invoke<string>('generate_frame', {
-          baseDescription,
-          animationName,
-          frameIndex: i,
-          totalFrames: frameCount,
-          poseDescription: pose,
-        });
-        frames = [...frames, frame];
-        if (i < frameCount - 1) {
-          await new Promise(r => setTimeout(r, 200));
-        }
-      }
+      const result = await invoke<string[]>('generate_row', {
+        baseDescription,
+        baseImage,
+        animationName,
+        frameCount,
+        poseDescriptions: poses.slice(0, frameCount),
+      });
+      frames = result;
 
       await composePreview();
       step = 3;
@@ -116,6 +138,7 @@
         filename: `${animationName}.png`,
         frames,
         framesPerRow,
+        baseImage,
       });
       onSaved();
       onClose();
@@ -123,19 +146,35 @@
       error = String(e);
     }
   }
+
+  checkExistingBase();
 </script>
 
 <div class="modal-overlay" onclick={onClose} role="presentation">
   <div class="modal" onclick={(e: MouseEvent) => e.stopPropagation()} onkeydown={(e: KeyboardEvent) => e.stopPropagation()} role="dialog" tabindex="-1">
-    {#if step === 1}
-      <h3>{t('ai.step1')} — {animationName}</h3>
-      <label>{t('ai.description')}
-        <input type="text" bind:value={description} placeholder="a cute orange cat" />
-      </label>
-      {#if error}<div class="error-box"><p>{error}</p></div>{/if}
-      <button class="btn" onclick={generateBase} disabled={generating || !description.trim()}>
-        {generating ? t('ai.generating') : t('ai.generateBase')}
-      </button>
+    {#if checkingBase}
+      <p class="status">{t('ai.checkingBase')}</p>
+    {:else if step === 1}
+      {#if hasExistingBase}
+        <h3>{t('ai.existingBaseTitle')}</h3>
+        <div class="base-preview">
+          <img src={baseImage} alt="base" />
+          <p>{baseDescription}</p>
+        </div>
+        <div class="actions">
+          <button class="btn" onclick={useExistingBase}>{t('ai.useCurrentBase')}</button>
+          <button class="btn subtle" onclick={() => { hasExistingBase = false; }}>{t('ai.regenerateBase')}</button>
+        </div>
+      {:else}
+        <h3>{t('ai.step1')} — {animationName}</h3>
+        <label>{t('ai.description')}
+          <input type="text" bind:value={description} placeholder="a cute orange cat" />
+        </label>
+        {#if error}<div class="error-box"><p>{error}</p></div>{/if}
+        <button class="btn" onclick={generateBase} disabled={generating || !description.trim()}>
+          {generating ? t('ai.generating') : t('ai.generateBase')}
+        </button>
+      {/if}
     {/if}
 
     {#if step === 2}
@@ -143,6 +182,7 @@
       <div class="base-preview">
         <img src={baseImage} alt="base" />
         <p>{t('ai.baseConfirm')}</p>
+        <p class="hint">{t('ai.baseHint').replace('{0}', String(frameCount))}</p>
       </div>
       <div class="params">
         <label>{t('ai.frameCount')} <input type="number" min={1} max={16} bind:value={frameCount} /></label>
@@ -152,7 +192,7 @@
       <div class="actions">
         <button class="btn subtle" onclick={() => { step = 1; }}>{t('ai.regenerateBase')}</button>
         <button class="btn" onclick={generateAnimation} disabled={generating}>
-          {generating ? `${t('ai.generating')} ${currentFrame}/${frameCount}` : t('ai.generateSpritesheet')}
+          {generating ? t('ai.generating') : t('ai.generateSpritesheet')}
         </button>
       </div>
     {/if}
@@ -187,6 +227,7 @@
   input { padding: 6px 8px; border: 1px solid var(--border-input); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg-secondary); color: var(--text-primary); }
   .base-preview { display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .base-preview img { max-width: 200px; max-height: 200px; image-rendering: pixelated; }
+  .hint { font-size: 11px; color: var(--text-muted); margin: 0; }
   .params { display: flex; gap: 12px; }
   .params label { flex: 1; }
   .params input { width: 60px; }
@@ -201,4 +242,5 @@
   .btn.subtle { background: transparent; color: var(--text-secondary); border-color: var(--border); }
   .error-box { background: #fce4e4; border: 1px solid #c62828; border-radius: var(--radius-sm); padding: 8px; }
   .error-box p { margin: 0; font-size: 13px; color: #c62828; }
+  .status { color: var(--text-muted); font-size: 13px; }
 </style>
