@@ -3,6 +3,7 @@
   import { invoke } from '@tauri-apps/api/core';
   import { t } from '../lib/i18n.svelte';
   import PetCard from './PetCard.svelte';
+  import AiGenerationModal from './AiGenerationModal.svelte';
 
   let {
     onActivatePet,
@@ -19,6 +20,8 @@
   let error = $state<string | null>(null);
   let showCreate = $state(false);
   let newName = $state('');
+  let createTab = $state<'blank' | 'ai'>('blank');
+  let showAiCreate = $state(false);
 
   async function loadPets() {
     loading = true;
@@ -61,12 +64,29 @@
   {#if showCreate}
     <div class="modal-overlay" onclick={() => { showCreate = false; }} role="presentation">
       <div class="modal" onclick={(e: MouseEvent) => e.stopPropagation()} role="dialog" tabindex="-1" onkeydown={(e: KeyboardEvent) => { if (e.key === 'Escape') showCreate = false; }}>
-        <h3>{t('home.newPet')}</h3>
-        <label>{t('home.name')} <input type="text" bind:value={newName} placeholder="my-pet" /></label>
-        <div class="modal-actions">
-          <button class="btn" onclick={doCreate} disabled={!newName.trim()}>{t('home.create')}</button>
-          <button class="btn subtle" onclick={() => { showCreate = false; }}>{t('home.cancel')}</button>
+        <div class="tab-bar">
+          <button class:active={createTab === 'blank'} onclick={() => createTab = 'blank'}>{t('home.newPet')}</button>
+          <button class:active={createTab === 'ai'} onclick={() => createTab = 'ai'}>AI {t('home.new')}</button>
         </div>
+        {#if createTab === 'blank'}
+          <h3>{t('home.newPet')}</h3>
+          <label>{t('home.name')} <input type="text" bind:value={newName} placeholder="my-pet" /></label>
+          <div class="modal-actions">
+            <button class="btn" onclick={doCreate} disabled={!newName.trim()}>{t('home.create')}</button>
+            <button class="btn subtle" onclick={() => { showCreate = false; }}>{t('home.cancel')}</button>
+          </div>
+        {:else}
+          <h3>AI {t('home.newPet')}</h3>
+          <label>{t('ai.description')}
+            <input type="text" bind:value={newName} placeholder="a cute orange cat" />
+          </label>
+          <div class="modal-actions">
+            <button class="btn" onclick={() => { showCreate = false; showAiCreate = true; }} disabled={!newName.trim()}>
+              {t('ai.generate')}
+            </button>
+            <button class="btn subtle" onclick={() => { showCreate = false; }}>{t('home.cancel')}</button>
+          </div>
+        {/if}
       </div>
     </div>
   {/if}
@@ -96,6 +116,20 @@
     </div>
   {/if}
 </div>
+
+{#if showAiCreate}
+  <AiGenerationModal
+    petId={newName.trim()}
+    animationName="idle"
+    onClose={() => { showAiCreate = false; newName = ''; }}
+    onSaved={() => {
+      showAiCreate = false;
+      newName = '';
+      loadPets();
+      onActivatePet(newName.trim());
+    }}
+  />
+{/if}
 
 <style>
   .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -127,4 +161,7 @@
   .skel-img { width: 64px; height: 64px; background: var(--border); border-radius: 4px; animation: pulse 1.5s infinite; }
   .skel-line { width: 50px; height: 10px; background: var(--border); border-radius: 3px; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .tab-bar button { padding: 6px 12px; border: none; background: none; cursor: pointer; font-size: 13px; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: inherit; }
+  .tab-bar button.active { color: var(--text-primary); border-bottom-color: var(--accent); font-weight: 600; }
 </style>

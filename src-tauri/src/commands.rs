@@ -12,6 +12,9 @@ pub struct AppSettings {
   pub scale: Option<u32>,
   pub language: Option<String>,
   pub autostart: Option<bool>,
+  pub ai_base_url: Option<String>,
+  pub ai_api_key: Option<String>,
+  pub ai_model: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -23,6 +26,9 @@ impl Default for AppSettings {
       scale: Some(5),
       language: Some("zh".into()),
       autostart: Some(false),
+      ai_base_url: None,
+      ai_api_key: None,
+      ai_model: None,
     }
   }
 }
@@ -105,7 +111,7 @@ pub fn list_pets(state: State<AppState>) -> Vec<String> {
   scan_pets(&dir)
 }
 
-fn sanitize_pet_id(id: &str) -> Result<(), String> {
+pub fn sanitize_pet_id(id: &str) -> Result<(), String> {
   if id.is_empty() || id.contains("..") || id.contains('/') || id.contains('\\') {
     return Err("invalid pet id".into());
   }
@@ -332,16 +338,23 @@ pub fn get_platform_info() -> serde_json::Value {
 }
 
 #[tauri::command]
-pub fn create_pet(state: tauri::State<AppState>, name: String, _frame_size: u32, _display_scale: u32) -> Result<(), String> {
+pub fn create_pet(state: tauri::State<AppState>, name: String, frame_size: u32, display_scale: u32) -> Result<(), String> {
   sanitize_pet_id(&name)?;
   let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
   let dir = resolve_pets_dir(&settings).join(&name);
   drop(settings);
   std::fs::create_dir_all(&dir).map_err(|e| format!("create dir: {}", e))?;
+  let frame_size = frame_size.max(1);
+  let display_scale = display_scale.clamp(1, 10);
   let manifest = serde_json::json!({
     "name": name,
     "version": "1.0.0",
     "author": "",
+    "frameWidth": frame_size,
+    "frameHeight": frame_size,
+    "displayScale": display_scale,
+    "windowWidth": frame_size * display_scale,
+    "windowHeight": frame_size * display_scale,
   });
   std::fs::write(
     dir.join("manifest.json"),
@@ -349,8 +362,13 @@ pub fn create_pet(state: tauri::State<AppState>, name: String, _frame_size: u32,
   ).map_err(|e| format!("write manifest: {}", e))?;
   let config = serde_json::json!({
     "animations": {},
-    "defaultState": "",
-    "states": {}
+    "defaultState": "idle",
+    "states": {
+      "idle": {
+        "entry": "idle",
+        "transitions": {}
+      }
+    }
   });
   std::fs::write(
     dir.join("config.json"),
@@ -734,6 +752,9 @@ mod tests {
       scale: Some(3),
       language: Some("en".into()),
       autostart: Some(true),
+      ai_base_url: None,
+      ai_api_key: None,
+      ai_model: None,
     };
     let json = serde_json::to_string_pretty(&original).unwrap();
     let restored: AppSettings = serde_json::from_str(&json).unwrap();

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { t, i18n, setLanguage, loadLanguage, type Lang } from '../lib/i18n.svelte';
+  import AiConfigPanel from './AiConfigPanel.svelte';
 
   let petsDir = $state('');
   let scale = $state(5);
@@ -113,6 +114,8 @@
         <option value="en">English</option>
       </select>
     </div>
+
+    <AiConfigPanel />
   {/if}
 </div>
 
