@@ -35,7 +35,7 @@
     const name = newName.trim();
     if (!name) return;
     try {
-      await invoke('create_pet', { name, frameSize: 32, displayScale: 5 });
+      await invoke('create_pet', { name, frameSize: 32 });
       showCreate = false;
       newName = '';
       loadPets();

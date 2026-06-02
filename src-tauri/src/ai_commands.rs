@@ -435,9 +435,6 @@ pub fn save_ai_sprite(
       "author": "",
       "frameWidth": 64,
       "frameHeight": 64,
-      "displayScale": 5,
-      "windowWidth": 320,
-      "windowHeight": 320
     });
     let mjson = serde_json::to_string_pretty(&manifest)
       .map_err(|e| format!("serialize manifest: {}", e))?;

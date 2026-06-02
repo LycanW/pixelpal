@@ -31,9 +31,6 @@ pets/my-pet/
 | `author` | string | Optional |
 | `frameWidth` | int | Source frame width in pixels |
 | `frameHeight` | int | Source frame height in pixels |
-| `displayScale` | int | Suggested initial scale multiplier (1–10). Actual display scale is controlled by global settings. |
-| `windowWidth` | int | **Reserved.** Not currently read by the engine. Present for tooling compatibility. |
-| `windowHeight` | int | **Reserved.** Not currently read by the engine. Present for tooling compatibility. |
 
 ## config.json
 
