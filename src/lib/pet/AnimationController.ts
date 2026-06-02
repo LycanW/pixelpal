@@ -41,13 +41,19 @@ export class AnimationController {
     const delays = this.perFrameDelays[this.currentAction];
     const maxFrame = (def.frameCount ?? (delays ? delays.length : FRAMES_PER_ACTION)) - 1;
 
+    const frameTime = typeof def.frameTime === 'number' ? def.frameTime : NaN;
+    if (Number.isNaN(frameTime)) {
+      console.error(`[AnimationController] "${this.currentAction}" is missing required field "frameTime"`);
+      return;
+    }
+
     let iterations = 0;
     while (iterations < 100) {
-      const frameTime = Math.max(1, delays
-        ? (def.frameTime > 0 ? def.frameTime : delays[this.frameIndex] ?? 100)
-        : (def.frameTime || 100));
-      if (this.timer < frameTime) break;
-      this.timer -= frameTime;
+      const stepMs = Math.max(1, delays
+        ? (frameTime > 0 ? frameTime : delays[this.frameIndex] ?? 100)
+        : frameTime);
+      if (this.timer < stepMs) break;
+      this.timer -= stepMs;
       iterations++;
 
       if (this.frameIndex >= maxFrame) {

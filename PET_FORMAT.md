@@ -31,9 +31,9 @@ pets/my-pet/
 | `author` | string | Optional |
 | `frameWidth` | int | Source frame width in pixels |
 | `frameHeight` | int | Source frame height in pixels |
-| `displayScale` | int | Scale multiplier (1–10) |
-| `windowWidth` | int | `frameWidth × displayScale` |
-| `windowHeight` | int | `frameHeight × displayScale` |
+| `displayScale` | int | Suggested initial scale multiplier (1–10). Actual display scale is controlled by global settings. |
+| `windowWidth` | int | **Reserved.** Not currently read by the engine. Present for tooling compatibility. |
+| `windowHeight` | int | **Reserved.** Not currently read by the engine. Present for tooling compatibility. |
 
 ## config.json
 
@@ -69,7 +69,7 @@ A map of animation name → definition.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `source` | string | required | Image filename in the pet folder |
-| `frameTime` | int | required | Milliseconds per frame. Set to `0` for GIFs to use per-frame delays. |
+| `frameTime` | int | required | Milliseconds per frame. **Required for PNG** and for GIF when overriding per-frame delays. Set to `0` for GIFs to use built-in per-frame delays. |
 | `loop` | bool | required | Restart from frame 0 after last frame? |
 | `frameCount` | int | auto | Number of frames. **PNG**: defaults to `4`. **GIF**: auto-detected from file. Set to limit playback. |
 | `framesPerRow` | int | `2` | **PNG only.** How many frames per row in the spritesheet. Ignored for GIFs. |

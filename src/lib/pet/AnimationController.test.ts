@@ -124,6 +124,19 @@ describe('AnimationController', () => {
     expect(onEnd).toHaveBeenCalledWith('anim');
   });
 
+  it('logs error and stops when frameTime is missing', () => {
+    const ctrl = new AnimationController();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    ctrl.setAnimations({
+      anim: { source: 'a.png', frameTime: undefined as unknown as number, loop: true },
+    });
+    ctrl.play('anim');
+
+    ctrl.update(100);
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('missing required field "frameTime"'));
+    consoleSpy.mockRestore();
+  });
+
   it('caps iterations to prevent infinite loops', () => {
     const ctrl = new AnimationController();
     ctrl.setAnimations({
