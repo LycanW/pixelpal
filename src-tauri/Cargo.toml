@@ -1,6 +1,6 @@
 [package]
 name = "pixelpal"
-version = "0.2.0"
+version = "0.2.1"
 description = "A pixel-art desktop pet app"
 authors = ["PixelPal Contributors"]
 license = "MIT"
