@@ -7,6 +7,7 @@ export class AnimationController {
   frameIndex: number = 0;
   private timer: number = 0;
   private activeDuration: number = 0;
+  private durationFired: boolean = false;
 
   private onActionEnd: ((action: string) => void) | null = null;
 
@@ -28,6 +29,7 @@ export class AnimationController {
       this.frameIndex = 0;
       this.timer = 0;
       this.activeDuration = 0;
+      this.durationFired = false;
     }
   }
 
@@ -68,7 +70,8 @@ export class AnimationController {
       }
     }
 
-    if (def.duration && this.activeDuration >= def.duration) {
+    if (def.duration && this.activeDuration >= def.duration && !this.durationFired) {
+      this.durationFired = true;
       this.onActionEnd?.(this.currentAction);
     }
   }

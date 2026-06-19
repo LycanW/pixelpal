@@ -74,8 +74,13 @@ fn rebuild_tray(app: &tauri::AppHandle) {
 fn build_tray(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let menu = build_menu(app)?;
 
+    let icon = app
+        .default_window_icon()
+        .ok_or("default window icon is missing")?
+        .clone();
+
     TrayIconBuilder::with_id("main")
-        .icon(app.default_window_icon().unwrap().clone())
+        .icon(icon)
         .menu(&menu)
         .on_menu_event(|app, event| handle_menu_event(app, event))
         .tooltip("PixelPal")
@@ -172,6 +177,7 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
             build_tray(app.handle())?;
 
             // Prevent Alt+F4 from killing the main pet window

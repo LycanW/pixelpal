@@ -7,6 +7,7 @@
   import { render } from './SpriteRenderer';
   import { loadAnimation, loadGifAnimation } from './SpriteLoader';
   import { FRAME_SIZE } from './config';
+  import { t } from '../i18n.svelte';
   import type { PetConfig, PetEvent, GifFrameData } from './types';
 
   let { petId = '', scale = 5 }: { petId?: string; scale?: number } = $props();
@@ -206,9 +207,9 @@
         ctx.font = `${10 * scale}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('未找到宠物', canvas.width / 2, canvas.height / 2 - 6 * scale);
+        ctx.fillText(t('pet.notFound'), canvas.width / 2, canvas.height / 2 - 6 * scale);
         ctx.font = `${8 * scale}px sans-serif`;
-        ctx.fillText('请在设置中添加', canvas.width / 2, canvas.height / 2 + 8 * scale);
+        ctx.fillText(t('pet.addInSettings'), canvas.width / 2, canvas.height / 2 + 8 * scale);
       } else {
         const sprite = sprites.get(controller.currentAction);
         const animDef = config.animations[controller.currentAction];
@@ -262,7 +263,7 @@
       dragOffY = e.clientY;
       targetX = e.screenX - dragOffX;
       targetY = e.screenY - dragOffY;
-      dispatch('press');
+      // press was already dispatched in handleMouseDown; only drag_start here.
       dispatch('drag_start');
       if (isWayland && mainWindow) {
         mainWindow.startDragging().catch(() => {});

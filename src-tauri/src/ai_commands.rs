@@ -3,7 +3,7 @@ use serde::Serialize;
 use tauri::State;
 use base64::Engine;
 use image::{DynamicImage, ImageEncoder};
-use crate::commands::{AppState, resolve_pets_dir, sanitize_pet_id, save_settings};
+use crate::commands::{AppState, resolve_pets_dir, sanitize_pet_id, sanitize_pet_path, save_settings};
 use crate::ai_image;
 use crate::ai_prompts;
 
@@ -331,6 +331,10 @@ pub fn save_ai_sprite(
   std::fs::create_dir_all(&pet_dir)
     .map_err(|e| format!("create dir: {}", e))?;
 
+  // Validate filename via sanitize_pet_path (prevents path traversal).
+  // Done after create_dir_all so pets_dir can be canonicalized.
+  let dest = sanitize_pet_path(&pets_dir, &pet_id, &filename)?;
+
   let mut decoded_frames = Vec::new();
   for (idx, b64_data) in frames.iter().enumerate() {
     let b64 = b64_data
@@ -348,10 +352,8 @@ pub fn save_ai_sprite(
     &decoded_frames, frames_per_row
   ).map_err(|e| format!("compose: {}", e))?;
 
-  let dest = pet_dir.join(&filename);
   spritesheet
-    .save_with_format(&dest, image::ImageFormat::Png
-    )
+    .save_with_format(&dest, image::ImageFormat::Png)
     .map_err(|e| format!("save spritesheet: {}", e))?;
 
   // ── persist base image as canonical reference for future animations ──
@@ -362,13 +364,13 @@ pub fn save_ai_sprite(
     let bytes = base64::engine::general_purpose::STANDARD
       .decode(b64)
       .map_err(|e| format!("decode base image: {}", e))?;
-    let base_dest = pet_dir.join("base.png");
+    let base_dest = sanitize_pet_path(&pets_dir, &pet_id, "base.png")?;
     std::fs::write(&base_dest, bytes)
       .map_err(|e| format!("save base image: {}", e))?;
   }
 
   // ── update config.json with animation definition ──
-  let config_path = pet_dir.join("config.json");
+  let config_path = sanitize_pet_path(&pets_dir, &pet_id, "config.json")?;
   let frame_count = frames.len() as u32;
   let anim_name = filename
     .trim_end_matches(".png")
@@ -427,7 +429,7 @@ pub fn save_ai_sprite(
     .map_err(|e| format!("write config: {}", e))?;
 
   // ── ensure manifest.json exists (required for scan_pets) ──
-  let manifest_path = pet_dir.join("manifest.json");
+  let manifest_path = sanitize_pet_path(&pets_dir, &pet_id, "manifest.json")?;
   if !manifest_path.exists() {
     let manifest = serde_json::json!({
       "name": pet_id,

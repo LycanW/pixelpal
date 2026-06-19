@@ -122,12 +122,13 @@
     petId={newName.trim()}
     animationName="idle"
     onClose={() => { showAiCreate = false; newName = ''; }}
-    onSaved={() => {
-      showAiCreate = false;
-      newName = '';
-      loadPets();
-      onActivatePet(newName.trim());
-    }}
+     onSaved={() => {
+       const id = newName.trim();
+       showAiCreate = false;
+       newName = '';
+       loadPets();
+       if (id) onActivatePet(id);
+     }}
   />
 {/if}
 

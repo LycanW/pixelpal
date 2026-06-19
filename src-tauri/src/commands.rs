@@ -49,17 +49,13 @@ pub fn load_settings() -> AppSettings {
   if let Some(parent) = path.parent() {
     let _ = std::fs::create_dir_all(parent);
   }
-  if path.exists() {
-    if let Ok(raw) = std::fs::read_to_string(&path) {
-      match serde_json::from_str(&raw) {
-        Ok(settings) => return settings,
-        Err(e) => log::warn!("failed to parse settings, using defaults: {}", e),
-      }
+  if let Ok(raw) = std::fs::read_to_string(&path) {
+    match serde_json::from_str(&raw) {
+      Ok(settings) => return settings,
+      Err(e) => log::warn!("failed to parse settings, using defaults: {}", e),
     }
-    AppSettings::default()
-  } else {
-    AppSettings::default()
   }
+  AppSettings::default()
 }
 
 pub fn save_settings(settings: &AppSettings) {
@@ -118,7 +114,7 @@ pub fn sanitize_pet_id(id: &str) -> Result<(), String> {
   Ok(())
 }
 
-fn sanitize_pet_path(pets_dir: &Path, id: &str, filename: &str) -> Result<PathBuf, String> {
+pub fn sanitize_pet_path(pets_dir: &Path, id: &str, filename: &str) -> Result<PathBuf, String> {
   // Prevent path traversal — reject ids/filenames with parent dir components
   if id.contains("..") || id.contains('/') || id.contains('\\') {
     return Err("invalid pet id".into());
@@ -430,8 +426,12 @@ pub async fn import_pet(app: tauri::AppHandle, state: tauri::State<'_, AppState>
     .file()
     .blocking_pick_folder();
   if let Some(p) = path {
-    let src = p.as_path().unwrap();
-    let name = src.file_name().unwrap().to_string_lossy().to_string();
+    let src = p.as_path().ok_or("invalid folder path")?;
+    let name = src
+      .file_name()
+      .and_then(|n| n.to_str())
+      .ok_or("cannot read folder name")?
+      .to_string();
     let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
     let dest = resolve_pets_dir(&settings).join(&name);
     drop(settings);
@@ -451,14 +451,18 @@ pub async fn import_pet_image(app: tauri::AppHandle, state: tauri::State<'_, App
     .add_filter("Images", &["png", "webp", "jpg", "jpeg", "gif"])
     .blocking_pick_file();
   if let Some(p) = path {
-    let src = p.as_path().unwrap();
-    let fname = src.file_name().unwrap().to_string_lossy().to_string();
+    let src = p.as_path().ok_or("invalid file path")?;
+    let fname = src
+      .file_name()
+      .and_then(|n| n.to_str())
+      .ok_or("cannot read file name")?
+      .to_string();
     let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner());
     let dir = resolve_pets_dir(&settings).join(&id);
     drop(settings);
     let dest = dir.join(&fname);
     std::fs::copy(src, &dest).map_err(|e| format!("copy: {}", e))?;
-    Ok(fname.to_string())
+    Ok(fname)
   } else {
     Err("No file selected".into())
   }

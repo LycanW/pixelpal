@@ -124,6 +124,23 @@ describe('AnimationController', () => {
     expect(onEnd).toHaveBeenCalledWith('anim');
   });
 
+  it('does not re-fire onEnd for duration on subsequent updates', () => {
+    const ctrl = new AnimationController();
+    const onEnd = vi.fn();
+    ctrl.onEnd(onEnd);
+
+    ctrl.setAnimations({
+      anim: { source: 'a.png', frameTime: 100, loop: true, duration: 250 },
+    });
+    ctrl.play('anim');
+
+    ctrl.update(300);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    ctrl.update(100);
+    ctrl.update(100);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+
   it('logs error and stops when frameTime is missing', () => {
     const ctrl = new AnimationController();
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
