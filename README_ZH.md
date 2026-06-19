@@ -54,7 +54,7 @@ npx tauri dev
 
 ```
 pets/my-pet/
-  manifest.json   # 名称、帧尺寸、显示缩放
+  manifest.json   # 名称、帧尺寸
   config.json     # 动画、状态、过渡定义
   idle.png        # 精灵表：可配置网格（如 2×2）
   walk.gif        # 或动画 GIF / WebP / JPEG
@@ -72,7 +72,7 @@ pets/my-pet/
 1. 通过托盘菜单打开设置
 2. 点击 **+ 新建** — 创建空的宠物目录和 `manifest.json`
 3. 点击齿轮图标打开宠物编辑器
-4. **配置** 选项卡 — 设置名称、帧尺寸、显示缩放
+4. **配置** 选项卡 — 设置名称和默认状态
 5. **动画** 选项卡 — 导入图像（PNG、GIF、WebP、JPEG），创建动画
 6. **交互** 选项卡 — 创建状态并定义鼠标事件过渡
 

@@ -54,7 +54,7 @@ Pets are stored in the OS data directory (`~/.local/share/pixelpal/pets/` on Lin
 
 ```
 pets/my-pet/
-  manifest.json   # name, frame size, display scale
+  manifest.json   # name, frame size
   config.json     # animations, states, transitions
   idle.png        # spritesheet: configurable grid (e.g. 2×2)
   walk.gif        # or animated GIF / WebP / JPEG
@@ -72,7 +72,7 @@ For the full spec, see [PET_FORMAT.md](PET_FORMAT.md).
 1. Open Settings via the tray menu
 2. Click **+ New** — creates an empty pet directory with `manifest.json`
 3. Click the gear icon to open the pet editor
-4. **Config** tab — set name, frame size, display scale
+4. **Config** tab — set name and default state
 5. **Animations** tab — import images (PNG, GIF, WebP, JPEG), create animations
 6. **Interactions** tab — create states and define transitions for mouse events
 

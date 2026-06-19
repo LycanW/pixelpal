@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { emit } from '@tauri-apps/api/event';
+  import { loadLanguage } from './lib/i18n.svelte';
   import PetCanvas from './lib/pet/PetCanvas.svelte';
 
   let petId = $state('');
@@ -13,6 +14,7 @@
       petId = await invoke<string>('get_active_pet');
       const s = await invoke<number>('get_scale');
       if (typeof s === 'number' && s >= 1 && s <= 10) scale = s;
+      await loadLanguage();
     } catch (e) { console.error('init:', e); }
 
     const { listen } = await import('@tauri-apps/api/event');

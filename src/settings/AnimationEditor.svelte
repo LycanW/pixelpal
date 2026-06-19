@@ -69,7 +69,7 @@
 
   async function deleteUnusedImage(filename: string) {
     if (usedBy(filename).length > 0) return;
-    if (!window.confirm(`Delete image file "${filename}"?`)) return;
+    if (!window.confirm(t('animation.confirmDeleteImage').replace('{0}', filename))) return;
     await deleteImageFile(filename);
   }
 
@@ -112,11 +112,14 @@
         const fc = anim.frameCount ?? 4;
         const fpr = anim.framesPerRow ?? 2;
         if (!fc || fc <= 0) {
-          error = `"${name}": Frames is empty or invalid`;
+          error = t('animation.framesEmpty').replace('{0}', name);
           return;
         }
         if (fc % fpr !== 0) {
-          error = `"${name}": Frames (${fc}) must be divisible by Per Row (${fpr})`;
+          error = t('animation.framesDivisible')
+            .replace('{0}', name)
+            .replace('{1}', String(fc))
+            .replace('{2}', String(fpr));
           return;
         }
       }
@@ -173,14 +176,14 @@
   }
 
   async function remove(name: string) {
-    if (!window.confirm(`Delete animation "${name}"?`)) return;
+    if (!window.confirm(t('animation.confirmDelete').replace('{0}', name))) return;
     const source = animations[name]?.source;
     const next = { ...animations };
     delete next[name];
     animations = next;
     markDirty();
 
-    if (source && usedBy(source, next).length === 0 && window.confirm(`Also delete unused image file "${source}"?`)) {
+    if (source && usedBy(source, next).length === 0 && window.confirm(t('animation.confirmDeleteUnused').replace('{0}', source))) {
       await deleteImageFile(source);
     }
   }

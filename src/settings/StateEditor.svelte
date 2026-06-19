@@ -103,7 +103,7 @@
 
   function removeState(name: string) {
     if (stateNames.length <= 1) return;
-    if (!window.confirm(`Delete state "${name}"?`)) return;
+    if (!window.confirm(t('state.confirmDelete').replace('{0}', name))) return;
 
     const affected = new Set<string>();
     const next: Record<string, StateConfig> = {};
@@ -225,7 +225,7 @@
             <h3>{name}</h3>
             <div class="state-actions">
               {#if dirtyStates[name]}
-                <button class="btn" onclick={() => saveState(name)}>Save</button>
+                <button class="btn" onclick={() => saveState(name)}>{t('state.save')}</button>
               {/if}
               <button class="del-btn" onclick={() => removeState(name)} disabled={stateNames.length <= 1} title="Remove state">✕</button>
             </div>

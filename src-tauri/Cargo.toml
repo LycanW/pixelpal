@@ -4,7 +4,6 @@ version = "0.2.1"
 description = "A pixel-art desktop pet app"
 authors = ["PixelPal Contributors"]
 license = "MIT"
-repository = ""
 edition = "2021"
 rust-version = "1.77.2"
 

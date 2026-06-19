@@ -25,7 +25,7 @@
   function switchTab(newTab: string) {
     if (newTab === tab) return;
     if (Object.values(dirtyTabs).some(Boolean)) {
-      if (!window.confirm('You have unsaved changes. Switch tabs?')) return;
+      if (!window.confirm(t('detail.unsavedSwitch'))) return;
       dirtyTabs = {};
     }
     tab = newTab;
@@ -33,7 +33,7 @@
 
   function handleBack() {
     if (Object.values(dirtyTabs).some(Boolean)) {
-      if (!window.confirm('You have unsaved changes. Go back?')) return;
+      if (!window.confirm(t('detail.unsavedBack'))) return;
     }
     onBack();
   }

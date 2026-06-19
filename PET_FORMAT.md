@@ -17,10 +17,7 @@ pets/my-pet/
   "version": "1.0.0",
   "author": "",
   "frameWidth": 32,
-  "frameHeight": 32,
-  "displayScale": 5,
-  "windowWidth": 160,
-  "windowHeight": 160
+  "frameHeight": 32
 }
 ```
 
